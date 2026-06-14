@@ -3,7 +3,6 @@ import { Gabarito } from "next/font/google";
 import { SideNav } from "@/components/nav";
 import { siteConfig } from "@/config/site";
 import { cn } from "@/lib/utils";
-//@ts-ignore
 import "@/style/globals.css";
 import { Providers } from "./providers";
 
