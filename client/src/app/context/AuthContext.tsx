@@ -31,7 +31,7 @@ const MOCK_GOOGLE_USER: User = {
   id: "usr_google_001",
   name: "Alex Johnson",
   email: "alex.johnson@gmail.com",
-  avatar: "https://api.dicebear.com/8.x/avataaars/svg?seed=AlexJohnson",
+  avatar: "",
   provider: "google",
   createdAt: new Date().toISOString(),
 };
