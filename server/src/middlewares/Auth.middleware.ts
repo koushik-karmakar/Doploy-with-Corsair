@@ -32,7 +32,6 @@ export interface JwtRefreshPayload {
   exp?: number;
 }
 
-// Extend Express Request to carry user
 declare global {
   namespace Express {
     interface Request {
@@ -61,7 +60,6 @@ export class AuthMiddleware {
     next: NextFunction,
   ): Promise<void> => {
     try {
-      // Extract token from Authorization header
       const authHeader = req.headers.authorization;
 
       if (!authHeader || !authHeader.startsWith("Bearer ")) {
@@ -84,7 +82,6 @@ export class AuthMiddleware {
         throw new TokenInvalidError("Access token is invalid");
       }
 
-      // Fetch user from DB to ensure they still exist and are active
       const [user] = await db
         .select({
           id: users.id,
@@ -105,7 +102,6 @@ export class AuthMiddleware {
         throw new UnauthorizedError("User account is deactivated");
       }
 
-      // Attach user to request
       req.user = {
         id: user.id,
         email: user.email,
@@ -166,7 +162,6 @@ export class AuthMiddleware {
 
       next();
     } catch {
-      // Token invalid but optional — proceed without user
       next();
     }
   };
@@ -217,7 +212,6 @@ export class AuthMiddleware {
         );
       }
 
-      // Fetch user
       const [user] = await db
         .select()
         .from(users)

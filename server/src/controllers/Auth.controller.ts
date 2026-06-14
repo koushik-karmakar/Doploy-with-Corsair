@@ -31,7 +31,6 @@ export class AuthController {
     try {
       logger.info("Google OAuth initiated", { ip: req.ip });
 
-      // Generate a random state for CSRF protection
       const state = Buffer.from(
         JSON.stringify({
           ts: Date.now(),
@@ -39,12 +38,11 @@ export class AuthController {
         }),
       ).toString("base64url");
 
-      // Store state in signed cookie for verification in callback
       res.cookie("oauth_state", state, {
         httpOnly: true,
         secure: env.NODE_ENV === "production",
         sameSite: "lax",
-        maxAge: 10 * 60 * 1000, // 10 minutes — OAuth flow must complete in time
+        maxAge: 10 * 60 * 1000,
         signed: true,
       });
 
@@ -76,7 +74,6 @@ export class AuthController {
         error?: string;
       };
 
-      // If Google returned an error (e.g., user denied access)
       if (oauthError) {
         logger.warn("Google OAuth denied by user", {
           error: oauthError,
@@ -91,7 +88,6 @@ export class AuthController {
         throw new BadRequestError("Authorization code missing from callback");
       }
 
-      // ── CSRF State Verification ────────────
       const savedState = req.signedCookies?.oauth_state;
       if (!savedState || savedState !== state) {
         logger.warn("OAuth state mismatch — possible CSRF attack", {
@@ -103,30 +99,22 @@ export class AuthController {
         ) as unknown as void;
       }
 
-      // Clear the state cookie
       res.clearCookie("oauth_state");
-
-      // Exchange code for tokens & get user info
       const googleUser = await this.authService.handleOAuthCallback(code);
-
-      // Find or create user in our DB
       const user = await this.authService.findOrCreateUser(googleUser);
-
-      // Issue JWT pair
       const tokens = await this.authService.issueTokenPair(
         user,
         req.ip,
         req.headers["user-agent"],
       );
 
-      // Set refresh token in httpOnly secure cookie
       res.cookie("refreshToken", tokens.refreshToken, {
         httpOnly: true,
         secure: env.NODE_ENV === "production",
         sameSite: env.NODE_ENV === "production" ? "strict" : "lax",
-        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+        maxAge: 7 * 24 * 60 * 60 * 1000,
         signed: true,
-        path: "/api/v1/auth", // Only sent to auth routes
+        path: "/api/v1/auth",
       });
 
       logger.info("User logged in via Google OAuth", {
@@ -134,8 +122,6 @@ export class AuthController {
         email: user.email,
       });
 
-      // Redirect to frontend with access token in URL fragment (never in query string)
-      // Frontend extracts it immediately and stores in memory (not localStorage)
       return res.redirect(
         `${env.FRONTEND_URL}/auth/success#token=${tokens.accessToken}&expiresIn=${tokens.accessExpiresIn}`,
       ) as unknown as void;
@@ -158,7 +144,6 @@ export class AuthController {
     next: NextFunction,
   ): Promise<void> => {
     try {
-      // Middleware already validated the refresh token and attached req.user
       if (!req.user) throw new UnauthorizedError("No user from refresh token");
 
       const oldRefreshToken =
@@ -169,7 +154,6 @@ export class AuthController {
         throw new UnauthorizedError("Refresh token not found");
       }
 
-      // Rotate tokens (revoke old, issue new)
       const tokens = await this.authService.rotateRefreshToken(
         req.user.id,
         oldRefreshToken,
@@ -177,7 +161,6 @@ export class AuthController {
         req.headers["user-agent"],
       );
 
-      // Update cookie with new refresh token
       res.cookie("refreshToken", tokens.refreshToken, {
         httpOnly: true,
         secure: env.NODE_ENV === "production",
@@ -223,7 +206,6 @@ export class AuthController {
         await this.authService.revokeRefreshToken(req.user.id, refreshToken);
       }
 
-      // Clear cookies
       res.clearCookie("refreshToken", { path: "/api/v1/auth" });
       res.clearCookie("oauth_state");
 
@@ -305,9 +287,7 @@ export class AuthController {
       }
 
       await this.authService.updateAgentMode(req.user.id, mode);
-
       logger.info("Agent mode updated", { userId: req.user.id, mode });
-
       ResponseHelper.success(
         res,
         { agentMode: mode },

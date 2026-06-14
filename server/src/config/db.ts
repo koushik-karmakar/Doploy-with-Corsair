@@ -21,13 +21,13 @@ class DatabaseConnection {
 
     this.pool = new Pool({
       connectionString: process.env.DATABASE_URL,
-      max: 20, // Maximum pool size
-      idleTimeoutMillis: 30000, // Close idle connections after 30s
-      connectionTimeoutMillis: 10000, // Wait max 10s for connection
+      max: 20, 
+      idleTimeoutMillis: 30000, 
+      connectionTimeoutMillis: 10000, 
       allowExitOnIdle: false,
     });
 
-    // Pool error handler
+   
     this.pool.on("error", (err: Error) => {
       logger.error("Unexpected PostgreSQL pool error", { error: err.message });
     });
@@ -56,10 +56,10 @@ class DatabaseConnection {
       const client = await this.pool.connect();
       await client.query("SELECT 1");
       client.release();
-      logger.info("✅ Database connection test passed");
+      logger.info("Database connection test passed");
       return true;
     } catch (error) {
-      logger.error("❌ Database connection test failed", {
+      logger.error("Database connection test failed", {
         error: error instanceof Error ? error.message : "Unknown error",
       });
       return false;

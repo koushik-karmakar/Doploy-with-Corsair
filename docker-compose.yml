@@ -1,0 +1,22 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: doploy-postgres
+
+    restart: unless-stopped
+
+    environment:
+      POSTGRES_USER: doploy_echo_user
+      POSTGRES_PASSWORD: doploy_echo_password
+      POSTGRES_DB: doploy_echo_db
+
+    ports:
+      - "5442:5432"
+
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:

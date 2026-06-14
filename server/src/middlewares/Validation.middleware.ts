@@ -1,6 +1,6 @@
-import { Request, Response, NextFunction } from "express";
-import { AnyZodObject, ZodError } from "zod";
-import { Logger } from "../utils/logger";
+import type { Request, Response, NextFunction } from "express";
+import { ZodObject, ZodError } from "zod";
+import { Logger } from "../utils/logger.js";
 
 const logger = Logger.getInstance();
 
@@ -13,7 +13,7 @@ const logger = Logger.getInstance();
  * Usage: router.post('/route', validate(schema), controller)
  */
 export const validate =
-  (schema: AnyZodObject) =>
+  (schema: ZodObject<any>) =>
   async (req: Request, _res: Response, next: NextFunction): Promise<void> => {
     try {
       await schema.parseAsync({

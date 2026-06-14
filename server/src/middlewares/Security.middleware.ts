@@ -36,16 +36,16 @@ export class SecurityMiddleware {
             frameSrc: ["'none'"],
           },
         },
-        crossOriginEmbedderPolicy: false, // Needed for some Google OAuth flows
+        crossOriginEmbedderPolicy: false,
         hsts: {
-          maxAge: 31536000, // 1 year
+          maxAge: 31536000,
           includeSubDomains: true,
           preload: true,
         },
-        noSniff: true, // X-Content-Type-Options: nosniff
-        xssFilter: true, // X-XSS-Protection
+        noSniff: true, 
+        xssFilter: true, 
         referrerPolicy: { policy: "strict-origin-when-cross-origin" },
-        frameguard: { action: "deny" }, // X-Frame-Options: DENY
+        frameguard: { action: "deny" },
       }),
     );
 
@@ -55,7 +55,6 @@ export class SecurityMiddleware {
     app.use(
       cors({
         origin: (origin, callback) => {
-          // Allow requests with no origin (mobile apps, curl, Postman in dev)
           if (!origin && env.NODE_ENV !== "production") {
             return callback(null, true);
           }
@@ -65,7 +64,7 @@ export class SecurityMiddleware {
           logger.warn("CORS blocked request from origin", { origin });
           return callback(new Error(`Origin ${origin} not allowed by CORS`));
         },
-        credentials: true, // Allow cookies
+        credentials: true, 
         methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
         allowedHeaders: [
           "Content-Type",
@@ -79,16 +78,12 @@ export class SecurityMiddleware {
           "RateLimit-Remaining",
           "RateLimit-Reset",
         ],
-        maxAge: 86400, // Cache preflight for 24 hours
+        maxAge: 86400,
       }),
     );
 
-    // ── 3. HPP — HTTP Parameter Pollution ─────
-    // Prevents ?role=user&role=admin attacks
+    // ── 3. HTTP Parameter Pollution ─────
     app.use(hpp());
-
-    // ── 4. Body Size Limits ───────────────────
-    // These are set in app.ts via express.json({ limit: '10kb' })
 
     // ── 5. Cookie Parser with Secret ─────────
     app.use(cookieParser(env.COOKIE_SECRET));
@@ -97,7 +92,7 @@ export class SecurityMiddleware {
     app.use(
       compression({
         level: 6,
-        threshold: 1024, // Only compress responses > 1KB
+        threshold: 1024,
         filter: (req, res) => {
           if (req.headers["x-no-compression"]) return false;
           return compression.filter(req, res);
@@ -109,13 +104,12 @@ export class SecurityMiddleware {
     if (env.NODE_ENV === "development") {
       app.use(morgan("dev"));
     } else {
-      // Production: structured JSON logging via Winston
       app.use(
         morgan("combined", {
           stream: {
             write: (message: string) => logger.http(message.trim()),
           },
-          skip: (req) => req.path === "/health", // Skip health check logs
+          skip: (req) => req.path === "/health",
         }),
       );
     }
@@ -125,7 +119,6 @@ export class SecurityMiddleware {
     app.use("/api/", RateLimitMiddleware.speedLimiter);
 
     // ── 9. Request ID middleware ──────────────
-    // Attach a unique ID to every request for tracing
     app.use((req: Request, _res: Response, next: NextFunction) => {
       req.headers["x-request-id"] =
         req.headers["x-request-id"] ||
@@ -138,6 +131,6 @@ export class SecurityMiddleware {
       app.set("trust proxy", 1);
     }
 
-    logger.info("✅ Security middleware applied");
+    logger.info("Security middleware applied");
   }
 }

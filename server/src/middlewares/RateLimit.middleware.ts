@@ -17,8 +17,8 @@ export class RateLimitMiddleware {
   public static general = rateLimit({
     windowMs: env.RATE_LIMIT_WINDOW_MS,
     max: env.RATE_LIMIT_MAX_REQUESTS,
-    standardHeaders: true,  // Return rate limit info in RateLimit-* headers
-    legacyHeaders: false,   // Disable X-RateLimit-* headers
+    standardHeaders: true, 
+    legacyHeaders: false, 
     skipSuccessfulRequests: false,
     message: {
       success: false,
@@ -49,7 +49,7 @@ export class RateLimitMiddleware {
     max: 10,
     standardHeaders: true,
     legacyHeaders: false,
-    skipSuccessfulRequests: true, // Don't count successful logins
+    skipSuccessfulRequests: true,
     message: {
       success: false,
       message: "Too many authentication attempts, please try again later",
@@ -110,7 +110,7 @@ export class RateLimitMiddleware {
   public static speedLimiter = slowDown({
     windowMs: 15 * 60 * 1000,
     delayAfter: 50,
-    delayMs: (used) => (used - 50) * 500, // 500ms delay per extra request
-    maxDelayMs: 5000, // Max 5 second delay
+    delayMs: (used) => (used - 50) * 500, 
+    maxDelayMs: 5000, 
   });
 }

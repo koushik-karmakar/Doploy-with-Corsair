@@ -17,7 +17,7 @@ const router = Router();
 router.get("/health", (_req: Request, res: Response) => {
   res.status(200).json({
     success: true,
-    message: "Chai Agent API is healthy 🍵",
+    message: "Echo Agent API is healthy",
     version: process.env.API_VERSION || "v1",
     environment: process.env.NODE_ENV || "development",
     uptime: `${Math.floor(process.uptime())}s`,

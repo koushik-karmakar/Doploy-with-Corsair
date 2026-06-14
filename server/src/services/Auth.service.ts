@@ -88,13 +88,12 @@ export class AuthService {
   // GOOGLE OAUTH METHODS
   // ─────────────────────────────────────────
 
-  /**
-   * Generate Google OAuth2 consent URL
-   */
+  //  Generate Google OAuth2 consent URL
+
   public generateAuthUrl(state?: string): string {
     const url = this.oauthClient.generateAuthUrl({
-      access_type: "offline", // Get refresh token
-      prompt: "consent", // Force consent to always get refresh_token
+      access_type: "offline",
+      prompt: "consent",
       scope: this.SCOPES,
       include_granted_scopes: true,
       state: state || Encryption.generateRandomToken(16),
@@ -104,12 +103,9 @@ export class AuthService {
     return url;
   }
 
-  /**
-   * Exchange authorization code for tokens and fetch user info
-   */
+  // Exchange authorization code for tokens and fetch user info
   public async handleOAuthCallback(code: string): Promise<GoogleUserInfo> {
     try {
-      // Exchange code for tokens
       const { tokens } = await this.oauthClient.getToken(code);
 
       if (!tokens.access_token) {
@@ -122,21 +118,18 @@ export class AuthService {
       }
 
       this.oauthClient.setCredentials(tokens);
-
-      // Fetch user info from Google
       const oauth2 = google.oauth2({
         version: "v2",
         auth: this.oauthClient as any,
       });
       const { data: userInfo } = await oauth2.userinfo.get();
-
       if (!userInfo.id || !userInfo.email) {
         throw new GoogleAuthError("Failed to fetch user info from Google");
       }
 
       const expiresAt = tokens.expiry_date
         ? new Date(tokens.expiry_date)
-        : new Date(Date.now() + 3600 * 1000); // Default 1 hour
+        : new Date(Date.now() + 3600 * 1000);
 
       logger.info("Google OAuth callback successful", {
         email: userInfo.email,
@@ -173,7 +166,6 @@ export class AuthService {
     try {
       const userName = googleUser.name ?? googleUser.email;
 
-      // Check if user already exists
       const [existingUser] = await db
         .select()
         .from(users)
@@ -181,7 +173,6 @@ export class AuthService {
         .limit(1);
 
       if (existingUser) {
-        // Update tokens and last login
         const [updatedUser] = await db
           .update(users)
           .set({
@@ -206,7 +197,6 @@ export class AuthService {
         return updatedUser;
       }
 
-      // Create new user
       const newUser: NewUser = {
         googleId: googleUser.googleId,
         email: googleUser.email,
@@ -258,7 +248,6 @@ export class AuthService {
     const accessToken = Encryption.decrypt(user.encryptedAccessToken);
     const refreshTokenValue = Encryption.decrypt(user.encryptedRefreshToken);
 
-    // Check if token is expired or expiring in next 5 minutes
     const isExpiredOrExpiring =
       !user.tokenExpiresAt ||
       user.tokenExpiresAt.getTime() < Date.now() + 5 * 60 * 1000;
@@ -267,7 +256,6 @@ export class AuthService {
       return accessToken;
     }
 
-    // Refresh the token
     logger.debug("Google access token expired, refreshing", { userId });
     return this.refreshGoogleToken(userId, refreshTokenValue);
   }
@@ -297,7 +285,6 @@ export class AuthService {
         ? new Date(credentials.expiry_date)
         : new Date(Date.now() + 3600 * 1000);
 
-      // Persist refreshed tokens
       await db
         .update(users)
         .set({
@@ -332,7 +319,6 @@ export class AuthService {
     ipAddress?: string,
     userAgent?: string,
   ): Promise<TokenPair> {
-    // Access Token (short-lived, stateless)
     const accessPayload: JwtAccessPayload = {
       userId: user.id,
       email: user.email,
@@ -354,7 +340,6 @@ export class AuthService {
       audience: "chai-agent-client",
     });
 
-    // Refresh Token (long-lived, stored in DB)
     const refreshTokenId = Encryption.generateRandomToken(32);
 
     const refreshPayload: JwtRefreshPayload = {
@@ -367,11 +352,9 @@ export class AuthService {
       issuer: "chai-agent",
     });
 
-    // Compute expiry for DB storage
     const refreshExpiresAt = new Date();
     refreshExpiresAt.setDate(refreshExpiresAt.getDate() + 7);
 
-    // Store refresh token in DB
     await db.insert(refreshTokens).values({
       userId: user.id,
       token: refreshTokenValue,
@@ -399,7 +382,6 @@ export class AuthService {
     ipAddress?: string,
     userAgent?: string,
   ): Promise<TokenPair> {
-    // Revoke old refresh token
     await db
       .update(refreshTokens)
       .set({ isRevoked: true })

@@ -14,7 +14,7 @@ export const errorHandler = (
   err: Error,
   req: Request,
   res: Response,
-  _next: NextFunction, // must have 4 params for Express to recognize as error handler
+  _next: NextFunction,
 ): void => {
   // ── Zod Validation Errors ──────────────────
   if (err instanceof ZodError) {
