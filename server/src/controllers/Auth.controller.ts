@@ -122,9 +122,10 @@ export class AuthController {
         email: user.email,
       });
 
-      return res.redirect(
-        `${env.FRONTEND_URL}/auth/success#token=${tokens.accessToken}&expiresIn=${tokens.accessExpiresIn}`,
-      ) as unknown as void;
+      const successUrl = new URL("/auth/success", env.FRONTEND_URL);
+      successUrl.hash = `token=${encodeURIComponent(tokens.accessToken)}&expiresIn=${encodeURIComponent(tokens.accessExpiresIn)}`;
+
+      return res.redirect(successUrl.toString()) as unknown as void;
     } catch (error) {
       logger.error("Google OAuth callback failed", {
         error: error instanceof Error ? error.message : "Unknown",

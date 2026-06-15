@@ -20,7 +20,6 @@ export class SecurityMiddleware {
    * Apply all security middleware to the Express app
    */
   public static apply(app: Application): void {
-    // ── 1. HELMET — Security HTTP Headers ─────
     app.use(
       helmet({
         contentSecurityPolicy: {

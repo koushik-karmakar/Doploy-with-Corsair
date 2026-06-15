@@ -9,13 +9,6 @@ import apiRouter from "./routes/index.js";
 import { configDotenv } from "dotenv";
 configDotenv();
 const app = express();
-import cors from "cors";
-app.use(
-  cors({
-    origin: env.CORS_ORIGINS,
-    credentials: true,
-  }),
-);
 
 app.use(
   express.json({

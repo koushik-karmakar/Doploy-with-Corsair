@@ -75,7 +75,12 @@ export function AuthSuccessPage() {
     window.history.replaceState(null, "", "/auth/success");
 
     void (async () => {
-      await refreshUser();
+      const result = await refreshUser();
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+
       router.replace("/dashboard");
     })();
   }, [refreshUser, router]);

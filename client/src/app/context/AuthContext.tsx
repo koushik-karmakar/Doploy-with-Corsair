@@ -8,15 +8,20 @@ import React, {
   useEffect,
   useState,
 } from "react";
+import { type AxiosError } from "axios";
 import { API_URL, api, setAccessToken } from "@/lib/api";
 import type { AuthState, User } from "./type.js";
 
 // ─── Context shape ─────────────────────────────────────────────────────────
 
+export type RefreshUserResult =
+  | { ok: true }
+  | { ok: false; error: string };
+
 interface AuthContextValue extends AuthState {
   login: () => void;
   logout: () => Promise<void>;
-  refreshUser: () => Promise<void>;
+  refreshUser: () => Promise<RefreshUserResult>;
 }
 
 // ─── Context ────────────────────────────────────────────────────────────────
@@ -44,18 +49,56 @@ export function AuthProvider({ children }: { children: ReactNode }) {
    *   stores the new access token, and retries this request once.
    * - If both fail, the user is treated as logged out.
    */
-  const fetchUser = useCallback(async () => {
+  const fetchUser = useCallback(async (): Promise<RefreshUserResult> => {
     try {
       const { data } = await api.get<MeResponse>("/auth/me");
       setUser(data.data);
-    } catch {
+      return { ok: true };
+    } catch (err) {
       setUser(null);
       setAccessToken(null);
+
+      const axiosErr = err as AxiosError<{ message?: string }>;
+      if (axiosErr.response) {
+        const status = axiosErr.response.status;
+        const serverMessage = axiosErr.response.data?.message;
+        return {
+          ok: false,
+          error: serverMessage
+            ? `GET /auth/me failed (${status}): ${serverMessage}`
+            : `GET /auth/me failed with status ${status}.`,
+        };
+      }
+
+      if (axiosErr.request) {
+        return {
+          ok: false,
+          error:
+            "Could not reach the API. Check that the backend is running and NEXT_PUBLIC_API_URL is correct.",
+        };
+      }
+
+      return {
+        ok: false,
+        error:
+          axiosErr.message || "An unexpected error occurred while loading your profile.",
+      };
     }
   }, []);
 
   useEffect(() => {
     let mounted = true;
+
+    // /auth/success reads #token=… and calls refreshUser itself.
+    // Bootstrapping here races that flow and can clear a token that was
+    // just saved (especially under React Strict Mode).
+    if (
+      typeof window !== "undefined" &&
+      window.location.pathname === "/auth/success"
+    ) {
+      setIsLoading(false);
+      return;
+    }
 
     void (async () => {
       await fetchUser();
