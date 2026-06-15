@@ -417,7 +417,7 @@ export default function EchoVoiceAgent() {
           <div className="flex items-center gap-2">
             <Bot size={18} className="text-[#60C2FB]" />
             <h2 className="text-[15px] font-medium tracking-tight text-white">
-              Chai · AI Voice Agent
+              Echo · AI Voice Agent
             </h2>
             <span className="flex items-center gap-1 text-[10px] font-medium text-[#60C2FB]">
               <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#60C2FB]" />
@@ -464,7 +464,7 @@ export default function EchoVoiceAgent() {
                 C
               </div>
               <div className="text-center">
-                <p className="text-[13px] font-medium text-white">Chai</p>
+                <p className="text-[13px] font-medium text-white">Echo</p>
                 <p className="text-[11px] text-[#7d8590]">
                   AI Email &amp; Calendar
                 </p>
@@ -549,8 +549,8 @@ export default function EchoVoiceAgent() {
                 </button>
                 <p className="text-[11px] text-[#7d8590]">
                   {isListening
-                    ? "Listening… speak to Chai"
-                    : "Press to speak to Chai"}
+                    ? "Listening… speak to Echo"
+                    : "Press to speak to Echo"}
                 </p>
               </div>
             )}

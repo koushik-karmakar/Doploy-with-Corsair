@@ -11,11 +11,9 @@ import { RateLimitMiddleware } from "../middlewares/RateLimit.middleware.js";
 const router = Router();
 const authController = new AuthController();
 
-/**
- * @route   GET /api/v1/auth/google
- * @desc    Initiate Google OAuth2 login — redirects to Google consent screen
- * @access  Public
- */
+//  GET /api/v1/auth/google
+// Initiate Google OAuth2 login — redirects to Google consent screen
+
 router.get(
   "/google",
   RateLimitMiddleware.authLimiter,

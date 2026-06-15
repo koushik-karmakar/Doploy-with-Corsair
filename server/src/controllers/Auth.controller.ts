@@ -30,7 +30,6 @@ export class AuthController {
   ): Promise<void> => {
     try {
       logger.info("Google OAuth initiated", { ip: req.ip });
-
       const state = Buffer.from(
         JSON.stringify({
           ts: Date.now(),
@@ -101,6 +100,7 @@ export class AuthController {
 
       res.clearCookie("oauth_state");
       const googleUser = await this.authService.handleOAuthCallback(code);
+      console.log("Google user info:", googleUser);
       const user = await this.authService.findOrCreateUser(googleUser);
       const tokens = await this.authService.issueTokenPair(
         user,

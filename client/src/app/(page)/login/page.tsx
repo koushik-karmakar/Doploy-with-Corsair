@@ -19,7 +19,7 @@ import { Spinner } from "@/components/ui/spinner";
 const PERKS = [
   { icon: Mail, text: "Smart Gmail inbox with AI priority filtering" },
   { icon: Calendar, text: "Google Calendar automation & smart scheduling" },
-  { icon: Mic, text: "Chai voice agent for hands-free control" },
+  { icon: Mic, text: "Echo voice agent for hands-free control" },
   { icon: Shield, text: "OAuth 2.0 — we never store your password" },
 ];
 
@@ -37,7 +37,7 @@ export default function LoginPage() {
     setSigning(true);
     try {
       await login();
-      router.push("/dashboard");
+      // router.push("/dashboard");
     } catch {
       setSigning(false);
     }
@@ -104,7 +104,7 @@ export default function LoginPage() {
               </span>
             </h1>
             <p className="mb-10 text-[14px] leading-relaxed text-[#8b9ab4]">
-              Connect your Google account and let Chai — your AI agent — handle
+              Connect your Google account and let Echo — your AI agent — handle
               the repetitive parts of your inbox and calendar.
             </p>
 

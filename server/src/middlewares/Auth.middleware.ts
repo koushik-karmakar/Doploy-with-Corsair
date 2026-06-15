@@ -1,47 +1,41 @@
 import type { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 import { db } from "../config/db.js";
-import { users, refreshTokens } from "../config/schema.js";
+import { refreshTokens } from "../config/schema.js";
 import { eq, and } from "drizzle-orm";
 import { env } from "../env.js";
 import { Logger } from "../utils/logger.js";
-import {
-  UnauthorizedError,
-  TokenExpiredError,
-  TokenInvalidError,
-} from "../utils/errors.js";
-
+import { UnauthorizedError, TokenInvalidError } from "../utils/errors.js";
 const logger = Logger.getInstance();
 
 // ─────────────────────────────────────────────
-// TOKEN PAYLOAD TYPES
+// JWT PAYLOAD TYPES
 // ─────────────────────────────────────────────
 
 export interface JwtAccessPayload {
   userId: string;
   email: string;
   googleId: string;
-  iat?: number;
-  exp?: number;
 }
 
 export interface JwtRefreshPayload {
   userId: string;
   tokenId: string;
-  iat?: number;
-  exp?: number;
 }
 
+// ─────────────────────────────────────────────
+// EXPRESS REQUEST AUGMENTATION
+// ─────────────────────────────────────────────
+
 declare global {
+  // eslint-disable-next-line @typescript-eslint/no-namespace
   namespace Express {
     interface Request {
       user?: {
         id: string;
-        email: string;
-        googleId: string;
-        name: string;
+        email?: string;
+        googleId?: string;
       };
-      accessToken?: string;
     }
   }
 }
@@ -52,122 +46,52 @@ declare global {
 
 export class AuthMiddleware {
   /**
-   * Protect routes — verifies Bearer access token from Authorization header
+   * Verifies the "Authorization: Bearer <accessToken>" header.
+   * On success, populates req.user with the decoded payload.
+   * Used on every protected route (/me, /logout, /agent-mode, ...).
    */
-  public static authenticate = async (
+  public static authenticate = (
     req: Request,
     _res: Response,
     next: NextFunction,
-  ): Promise<void> => {
+  ): void => {
     try {
-      const authHeader = req.headers.authorization;
+      const header = req.headers.authorization;
 
-      if (!authHeader || !authHeader.startsWith("Bearer ")) {
-        throw new UnauthorizedError(
-          "Authorization header missing or malformed",
-        );
+      if (!header || !header.startsWith("Bearer ")) {
+        throw new UnauthorizedError("Missing or invalid Authorization header");
       }
 
-      const token = authHeader.split(" ")[1];
-      if (!token) throw new UnauthorizedError("Access token missing");
+      const token = header.slice("Bearer ".length).trim();
 
-      // Verify JWT
-      let payload: JwtAccessPayload;
-      try {
-        payload = jwt.verify(token, env.JWT_ACCESS_SECRET) as JwtAccessPayload;
-      } catch (jwtError) {
-        if (jwtError instanceof jwt.TokenExpiredError) {
-          throw new TokenExpiredError("Access token has expired");
-        }
-        throw new TokenInvalidError("Access token is invalid");
-      }
-
-      const [user] = await db
-        .select({
-          id: users.id,
-          email: users.email,
-          googleId: users.googleId,
-          name: users.name,
-          isActive: users.isActive,
-        })
-        .from(users)
-        .where(eq(users.id, payload.userId))
-        .limit(1);
-
-      if (!user) {
-        throw new UnauthorizedError("User account not found");
-      }
-
-      if (!user.isActive) {
-        throw new UnauthorizedError("User account is deactivated");
-      }
+      const decoded = jwt.verify(token, env.JWT_ACCESS_SECRET, {
+        issuer: "Echo-agent",
+        audience: "Echo-agent-client",
+      }) as JwtAccessPayload;
 
       req.user = {
-        id: user.id,
-        email: user.email,
-        googleId: user.googleId,
-        name: user.name,
+        id: decoded.userId,
+        email: decoded.email,
+        googleId: decoded.googleId,
       };
-      req.accessToken = token;
 
-      logger.debug("User authenticated", { userId: user.id, path: req.path });
       next();
     } catch (error) {
+      if (error instanceof jwt.TokenExpiredError) {
+        return next(new UnauthorizedError("Access token expired"));
+      }
+      if (error instanceof jwt.JsonWebTokenError) {
+        return next(new UnauthorizedError("Invalid access token"));
+      }
       next(error);
     }
   };
 
   /**
-   * Optional authentication — attaches user if token provided, but doesn't fail if missing
-   */
-  public static optionalAuthenticate = async (
-    req: Request,
-    _res: Response,
-    next: NextFunction,
-  ): Promise<void> => {
-    try {
-      const authHeader = req.headers.authorization;
-      if (!authHeader || !authHeader.startsWith("Bearer ")) {
-        return next();
-      }
-
-      const token = authHeader.split(" ")[1];
-      if (!token) return next();
-
-      const payload = jwt.verify(
-        token,
-        env.JWT_ACCESS_SECRET,
-      ) as JwtAccessPayload;
-
-      const [user] = await db
-        .select({
-          id: users.id,
-          email: users.email,
-          googleId: users.googleId,
-          name: users.name,
-          isActive: users.isActive,
-        })
-        .from(users)
-        .where(eq(users.id, payload.userId))
-        .limit(1);
-
-      if (user && user.isActive) {
-        req.user = {
-          id: user.id,
-          email: user.email,
-          googleId: user.googleId,
-          name: user.name,
-        };
-      }
-
-      next();
-    } catch {
-      next();
-    }
-  };
-
-  /**
-   * Validate refresh token from httpOnly cookie
+   * Verifies the refresh token (from the signed httpOnly cookie, or
+   * from the request body as a fallback for non-browser clients),
+   * confirms it hasn't been revoked/expired in the DB, and populates
+   * req.user.id so AuthController.refreshAccessToken can rotate it.
    */
   public static validateRefreshToken = async (
     req: Request,
@@ -175,62 +99,48 @@ export class AuthMiddleware {
     next: NextFunction,
   ): Promise<void> => {
     try {
-      const refreshToken =
-        req.cookies?.refreshToken ||
+      const token: string | undefined =
+        req.signedCookies?.refreshToken ||
         (req.body as { refreshToken?: string })?.refreshToken;
 
-      if (!refreshToken) {
-        throw new UnauthorizedError("Refresh token missing");
+      if (!token) {
+        throw new UnauthorizedError("Refresh token not found");
       }
 
-      // Verify JWT signature first
-      let payload: JwtRefreshPayload;
-      try {
-        payload = jwt.verify(
-          refreshToken,
-          env.JWT_REFRESH_SECRET,
-        ) as JwtRefreshPayload;
-      } catch {
-        throw new TokenInvalidError("Refresh token is invalid or expired");
-      }
+      const decoded = jwt.verify(token, env.JWT_REFRESH_SECRET, {
+        issuer: "Echo-agent",
+      }) as JwtRefreshPayload;
 
-      // Check DB for token existence and revocation
-      const [storedToken] = await db
+      const [record] = await db
         .select()
         .from(refreshTokens)
         .where(
           and(
-            eq(refreshTokens.userId, payload.userId),
-            eq(refreshTokens.isRevoked, false),
+            eq(refreshTokens.userId, decoded.userId),
+            eq(refreshTokens.token, token),
           ),
         )
         .limit(1);
 
-      if (!storedToken) {
-        throw new TokenInvalidError(
-          "Refresh token has been revoked or not found",
-        );
+      if (!record || record.isRevoked) {
+        throw new TokenInvalidError("Refresh token has been revoked");
       }
 
-      const [user] = await db
-        .select()
-        .from(users)
-        .where(eq(users.id, payload.userId))
-        .limit(1);
-
-      if (!user || !user.isActive) {
-        throw new UnauthorizedError("User not found or deactivated");
+      if (record.expiresAt.getTime() < Date.now()) {
+        throw new TokenInvalidError("Refresh token has expired");
       }
 
-      req.user = {
-        id: user.id,
-        email: user.email,
-        googleId: user.googleId,
-        name: user.name,
-      };
-
+      req.user = { id: decoded.userId };
       next();
     } catch (error) {
+      if (error instanceof jwt.TokenExpiredError) {
+        logger.warn("Refresh token JWT expired", { ip: req.ip });
+        return next(new UnauthorizedError("Refresh token expired"));
+      }
+      if (error instanceof jwt.JsonWebTokenError) {
+        logger.warn("Invalid refresh token JWT", { ip: req.ip });
+        return next(new UnauthorizedError("Invalid refresh token"));
+      }
       next(error);
     }
   };

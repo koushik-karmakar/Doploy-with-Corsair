@@ -12,6 +12,7 @@ import {
   UnauthorizedError,
   DatabaseError,
   TokenInvalidError,
+  NotFoundError,
 } from "../utils/errors.js";
 import type { User, NewUser } from "../config/schema.js";
 import type {
@@ -94,8 +95,7 @@ export class AuthService {
     const url = this.oauthClient.generateAuthUrl({
       access_type: "offline",
       prompt: "consent",
-      scope: this.SCOPES,
-      include_granted_scopes: true,
+      scope: ["openid", "email", "profile"],
       state: state || Encryption.generateRandomToken(16),
     });
 
@@ -165,6 +165,7 @@ export class AuthService {
   public async findOrCreateUser(googleUser: GoogleUserInfo): Promise<User> {
     try {
       const userName = googleUser.name ?? googleUser.email;
+     
 
       const [existingUser] = await db
         .select()
@@ -336,8 +337,8 @@ export class AuthService {
 
     const accessToken = jwt.sign(accessPayload, env.JWT_ACCESS_SECRET, {
       expiresIn: accessExpiresIn,
-      issuer: "chai-agent",
-      audience: "chai-agent-client",
+      issuer: "Echo-agent",
+      audience: "Echo-agent-client",
     });
 
     const refreshTokenId = Encryption.generateRandomToken(32);
@@ -349,7 +350,7 @@ export class AuthService {
 
     const refreshTokenValue = jwt.sign(refreshPayload, env.JWT_REFRESH_SECRET, {
       expiresIn: refreshExpiresIn,
-      issuer: "chai-agent",
+      issuer: "Echo-agent",
     });
 
     const refreshExpiresAt = new Date();
