@@ -21,7 +21,7 @@ import {
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import React, { useEffect, useState } from "react";
-import { useAuth } from "@/app/context/AuthContext";
+import { useAuthRoute } from "@/app/context/AuthRouteProvider";
 
 // ─── Data ────────────────────────────────────────────────────────────────────
 
@@ -203,7 +203,7 @@ function GoogleIcon() {
 // ─── Nav ─────────────────────────────────────────────────────────────────────
 function LandingNav({ onLogin }: { onLogin: () => void }) {
   const [scrolled, setScrolled] = useState(false);
-  const { isAuthenticated } = useAuth();
+  const { canShowGuestActions, canShowAuthenticatedActions } = useAuthRoute();
 
   useEffect(() => {
     const handler = () => setScrolled(window.scrollY > 16);
@@ -287,7 +287,7 @@ function LandingNav({ onLogin }: { onLogin: () => void }) {
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          {isAuthenticated ? (
+          {canShowAuthenticatedActions ? (
             <Link
               href="/dashboard"
               style={{
@@ -305,7 +305,7 @@ function LandingNav({ onLogin }: { onLogin: () => void }) {
             >
               Dashboard <ArrowRight size={13} />
             </Link>
-          ) : (
+          ) : canShowGuestActions ? (
             <>
               <button
                 onClick={onLogin}
@@ -354,6 +354,8 @@ function LandingNav({ onLogin }: { onLogin: () => void }) {
                 Get started <ArrowRight size={13} />
               </button>
             </>
+          ) : (
+            <div style={{ width: 148, height: 36 }} aria-hidden="true" />
           )}
         </div>
       </div>
@@ -364,11 +366,7 @@ function LandingNav({ onLogin }: { onLogin: () => void }) {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export default function LandingPage() {
   const router = useRouter();
-  const { isAuthenticated } = useAuth();
-
-  useEffect(() => {
-    if (isAuthenticated) router.replace("/dashboard");
-  }, [isAuthenticated, router]);
+  const { canShowGuestActions, canShowAuthenticatedActions } = useAuthRoute();
 
   const handleLogin = () => router.push("/login");
 
@@ -508,34 +506,58 @@ export default function LandingPage() {
             marginBottom: 60,
           }}
         >
-          <button
-            onClick={handleLogin}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              padding: "14px 28px",
-              borderRadius: 14,
-              border: "none",
-              background: "linear-gradient(135deg,#3161F8 0%,#60C2FB 100%)",
-              color: "#fff",
-              fontSize: 15,
-              fontWeight: 700,
-              cursor: "pointer",
-              transition: "transform 0.15s, box-shadow 0.15s",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.transform = "translateY(-2px)";
-              e.currentTarget.style.boxShadow =
-                "0 12px 32px rgba(49,97,248,0.35)";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.transform = "none";
-              e.currentTarget.style.boxShadow = "none";
-            }}
-          >
-            <GoogleIcon /> Continue with Google <ArrowRight size={14} />
-          </button>
+          {canShowAuthenticatedActions ? (
+            <Link
+              href="/dashboard"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                padding: "14px 28px",
+                borderRadius: 14,
+                border: "none",
+                background: "linear-gradient(135deg,#3161F8 0%,#60C2FB 100%)",
+                color: "#fff",
+                fontSize: 15,
+                fontWeight: 700,
+                textDecoration: "none",
+                transition: "transform 0.15s, box-shadow 0.15s",
+              }}
+            >
+              Go to Dashboard <ArrowRight size={14} />
+            </Link>
+          ) : canShowGuestActions ? (
+            <button
+              onClick={handleLogin}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                padding: "14px 28px",
+                borderRadius: 14,
+                border: "none",
+                background: "linear-gradient(135deg,#3161F8 0%,#60C2FB 100%)",
+                color: "#fff",
+                fontSize: 15,
+                fontWeight: 700,
+                cursor: "pointer",
+                transition: "transform 0.15s, box-shadow 0.15s",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = "translateY(-2px)";
+                e.currentTarget.style.boxShadow =
+                  "0 12px 32px rgba(49,97,248,0.35)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = "none";
+                e.currentTarget.style.boxShadow = "none";
+              }}
+            >
+              <GoogleIcon /> Continue with Google <ArrowRight size={14} />
+            </button>
+          ) : (
+            <div style={{ width: 260, height: 52 }} aria-hidden="true" />
+          )}
           <a
             href="#features"
             style={{
@@ -1394,39 +1416,66 @@ export default function LandingPage() {
                 <p style={{ fontSize: 12, color: "#4d5d78", marginBottom: 24 }}>
                   {plan.description}
                 </p>
-                <button
-                  onClick={handleLogin}
-                  style={{
-                    width: "100%",
-                    padding: "11px 0",
-                    borderRadius: 10,
-                    border: plan.highlighted ? "none" : "1px solid #2a3347",
-                    background: plan.highlighted ? "#3161F8" : "transparent",
-                    color: plan.highlighted ? "#fff" : "#8b9ab4",
-                    fontSize: 13,
-                    fontWeight: 600,
-                    cursor: "pointer",
-                    marginBottom: 24,
-                  }}
-                  onMouseEnter={(e) => {
-                    if (plan.highlighted)
-                      e.currentTarget.style.background = "#4a77f8";
-                    else {
-                      e.currentTarget.style.borderColor = "#3a4a63";
-                      e.currentTarget.style.color = "#e6edf3";
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (plan.highlighted)
-                      e.currentTarget.style.background = "#3161F8";
-                    else {
-                      e.currentTarget.style.borderColor = "#2a3347";
-                      e.currentTarget.style.color = "#8b9ab4";
-                    }
-                  }}
-                >
-                  {plan.cta}
-                </button>
+                {canShowAuthenticatedActions ? (
+                  <Link
+                    href="/dashboard"
+                    style={{
+                      display: "block",
+                      width: "100%",
+                      padding: "11px 0",
+                      borderRadius: 10,
+                      border: "none",
+                      background: plan.highlighted ? "#3161F8" : "transparent",
+                      color: plan.highlighted ? "#fff" : "#8b9ab4",
+                      fontSize: 13,
+                      fontWeight: 600,
+                      textAlign: "center",
+                      textDecoration: "none",
+                      marginBottom: 24,
+                    }}
+                  >
+                    Go to Dashboard
+                  </Link>
+                ) : canShowGuestActions ? (
+                  <button
+                    onClick={handleLogin}
+                    style={{
+                      width: "100%",
+                      padding: "11px 0",
+                      borderRadius: 10,
+                      border: plan.highlighted ? "none" : "1px solid #2a3347",
+                      background: plan.highlighted ? "#3161F8" : "transparent",
+                      color: plan.highlighted ? "#fff" : "#8b9ab4",
+                      fontSize: 13,
+                      fontWeight: 600,
+                      cursor: "pointer",
+                      marginBottom: 24,
+                    }}
+                    onMouseEnter={(e) => {
+                      if (plan.highlighted)
+                        e.currentTarget.style.background = "#4a77f8";
+                      else {
+                        e.currentTarget.style.borderColor = "#3a4a63";
+                        e.currentTarget.style.color = "#e6edf3";
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (plan.highlighted)
+                        e.currentTarget.style.background = "#3161F8";
+                      else {
+                        e.currentTarget.style.borderColor = "#2a3347";
+                        e.currentTarget.style.color = "#8b9ab4";
+                      }
+                    }}
+                  >
+                    {plan.cta}
+                  </button>
+                ) : (
+                  <div
+                    style={{ width: "100%", height: 40, marginBottom: 24 }}
+                    aria-hidden="true"
+                  />
+                )}
                 <ul
                   style={{
                     listStyle: "none",
@@ -1526,36 +1575,61 @@ export default function LandingPage() {
               Connect Google, say hello, and let Echo take it from there. Free
               forever, no card required.
             </p>
-            <button
-              onClick={handleLogin}
-              style={{
-                position: "relative",
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 8,
-                padding: "15px 32px",
-                borderRadius: 14,
-                border: "none",
-                background: "linear-gradient(135deg,#3161F8 0%,#60C2FB 100%)",
-                color: "#fff",
-                fontSize: 15,
-                fontWeight: 700,
-                cursor: "pointer",
-                transition: "transform 0.15s, box-shadow 0.15s",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.transform =
-                  "translateY(-2px) scale(1.02)";
-                e.currentTarget.style.boxShadow =
-                  "0 16px 40px rgba(49,97,248,0.35)";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.transform = "none";
-                e.currentTarget.style.boxShadow = "none";
-              }}
-            >
-              <GoogleIcon /> Get started with Google <ArrowRight size={15} />
-            </button>
+            {canShowAuthenticatedActions ? (
+              <Link
+                href="/dashboard"
+                style={{
+                  position: "relative",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 8,
+                  padding: "15px 32px",
+                  borderRadius: 14,
+                  border: "none",
+                  background: "linear-gradient(135deg,#3161F8 0%,#60C2FB 100%)",
+                  color: "#fff",
+                  fontSize: 15,
+                  fontWeight: 700,
+                  textDecoration: "none",
+                  transition: "transform 0.15s, box-shadow 0.15s",
+                }}
+              >
+                Go to Dashboard <ArrowRight size={15} />
+              </Link>
+            ) : canShowGuestActions ? (
+              <button
+                onClick={handleLogin}
+                style={{
+                  position: "relative",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 8,
+                  padding: "15px 32px",
+                  borderRadius: 14,
+                  border: "none",
+                  background: "linear-gradient(135deg,#3161F8 0%,#60C2FB 100%)",
+                  color: "#fff",
+                  fontSize: 15,
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  transition: "transform 0.15s, box-shadow 0.15s",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform =
+                    "translateY(-2px) scale(1.02)";
+                  e.currentTarget.style.boxShadow =
+                    "0 16px 40px rgba(49,97,248,0.35)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = "none";
+                  e.currentTarget.style.boxShadow = "none";
+                }}
+              >
+                <GoogleIcon /> Get started with Google <ArrowRight size={15} />
+              </button>
+            ) : (
+              <div style={{ width: 280, height: 54 }} aria-hidden="true" />
+            )}
           </div>
         </div>
       </section>

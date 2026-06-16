@@ -11,8 +11,7 @@ import {
   Zap,
 } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { useAuth } from "@/app/context/AuthContext";
 import { Spinner } from "@/components/ui/spinner";
 
@@ -24,14 +23,8 @@ const PERKS = [
 ];
 
 export default function LoginPage() {
-  const { login, isAuthenticated, isLoading } = useAuth();
-  const router = useRouter();
+  const { login } = useAuth();
   const [signing, setSigning] = useState(false);
-
-  // Redirect if already authenticated
-  useEffect(() => {
-    if (isAuthenticated) router.replace("/dashboard");
-  }, [isAuthenticated, router]);
 
   const handleGoogleLogin = async () => {
     setSigning(true);
@@ -42,14 +35,6 @@ export default function LoginPage() {
       setSigning(false);
     }
   };
-
-  if (isLoading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-[#080c14]">
-        <Spinner size={32} />
-      </div>
-    );
-  }
 
   return (
     <div className="flex min-h-screen overflow-hidden bg-[#080c14]">
