@@ -34,8 +34,10 @@ import {
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import Link from "next/link";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useAuth } from "@/app/context/AuthContext";
+import { api } from "@/lib/api";
+import { getGmailClient } from "@/lib/google";
 
 // ─── Inline ThemeToggle (no external dependency) ─────────────────────────────
 function ThemeToggle() {
@@ -907,7 +909,7 @@ function Sidebar({
 
   return (
     <aside
-      className="flex h-full flex-col"
+      className="flex h-[calc(100%-60px)] flex-col"
       style={{
         width: 220,
         background: "var(--sidebar-bg)",
@@ -1113,7 +1115,7 @@ export default function EmailPage() {
       `}</style>
 
       <div
-        className="flex h-screen overflow-hidden"
+        className="flex h-full overflow-hidden"
         style={{ background: "var(--main-bg)" }}
       >
         <Sidebar
@@ -1123,7 +1125,7 @@ export default function EmailPage() {
         />
 
         {/* Main area */}
-        <div className="flex min-w-0 flex-1 flex-col">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
           {/* Top bar */}
           <div
             className="flex items-center gap-3 px-5 py-3"

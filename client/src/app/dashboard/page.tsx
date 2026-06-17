@@ -7,7 +7,9 @@ import {
 } from "@/components/chart-blocks";
 import Container from "@/components/container";
 
+
 export default function Home() {
+  
   return (
     <div>
       <Metrics />
@@ -19,7 +21,6 @@ export default function Home() {
           <Conversions />
         </Container>
       </div>
-      
     </div>
   );
 }
