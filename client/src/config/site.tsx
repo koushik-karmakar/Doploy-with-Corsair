@@ -1,4 +1,13 @@
-import { Gauge, type LucideIcon, MessagesSquare, Mail, Calendar, ListCheck, Settings, BrainCircuit } from "lucide-react";
+import {
+  BrainCircuit,
+  Calendar,
+  Gauge,
+  ListCheck,
+  type LucideIcon,
+  Mail,
+  MessagesSquare,
+  Settings,
+} from "lucide-react";
 
 export type SiteConfig = typeof siteConfig;
 export type Navigation = {
@@ -16,31 +25,31 @@ export const navigations: Navigation[] = [
   {
     icon: Gauge,
     name: "Dashboard",
-    href: "/",
+    href: "/dashboard",
   },
   {
     icon: Mail,
     name: "Email",
-    href: "/email",
+    href: "/dashboard/email",
   },
   {
     icon: Calendar,
     name: "Calendar",
-    href: "/calendar",
+    href: "/dashboard/calendar",
   },
   {
     icon: BrainCircuit,
     name: "Voice Agent",
-    href: "/voice-agent",
+    href: "/dashboard/voice-agent",
   },
   {
     icon: ListCheck,
     name: "Commands",
-    href: "/commands",
+    href: "/dashboard/commands",
   },
   {
     icon: Settings,
     name: "Settings",
-    href: "/settings",
+    href: "/dashboard/settings",
   },
 ];

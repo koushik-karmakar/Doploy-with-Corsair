@@ -7,9 +7,9 @@ export default function DashboardLayout({
 }) {
   return (
     <div className="flex min-h-screen">
-      <SideNav />
+      {/* <SideNav /> */}
       <main className="flex-1 overflow-auto">
-        <TopNav title="Dashboard" />
+        {/* <TopNav title="Dashboard" /> */}
         {children}
       </main>
     </div>
