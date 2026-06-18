@@ -8,7 +8,6 @@ import {
   Circle,
   Clock,
   Edit3,
-  Filter,
   Inbox,
   Loader2,
   Mail,
@@ -33,13 +32,11 @@ import {
   Zap,
 } from "lucide-react";
 import { useTheme } from "next-themes";
-import Link from "next/link";
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "@/app/context/AuthContext";
 import { api } from "@/lib/api";
-import { getGmailClient } from "@/lib/google";
 
-// ─── Inline ThemeToggle (no external dependency) ─────────────────────────────
+// ─── ThemeToggle ──────────────────────────────────────────────────────────────
 function ThemeToggle() {
   const { theme, setTheme } = useTheme();
   const [open, setOpen] = useState(false);
@@ -48,7 +45,7 @@ function ThemeToggle() {
     <div className="relative">
       <button
         onClick={() => setOpen((o) => !o)}
-        className="flex items-center justify-center rounded-lg border p-2 transition-colors"
+        className="flex items-center justify-center rounded-lg p-2 transition-colors"
         style={{
           border: "1px solid var(--border-color)",
           background: "transparent",
@@ -97,7 +94,6 @@ function ThemeToggle() {
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-
 interface Email {
   id: string;
   from: string;
@@ -126,224 +122,23 @@ type Folder =
   | "spam"
   | "trash";
 
-// ─── Mock data ────────────────────────────────────────────────────────────────
-
-const EMAILS: Email[] = [
-  {
-    id: "1",
-    from: "Vercel",
-    fromEmail: "noreply@vercel.com",
-    initials: "V",
-    avatarColor: "#3161F8",
-    subject:
-      "Failed production deployments on team 'Koushik Karmakar's projects'",
-    preview:
-      "Hello, Koushik Karmakar. There was an error deploying your project...",
-    body: "Hello, Koushik Karmakar.\n\nThere was an error deploying your project to production. The deployment failed due to a build error in your Next.js application.\n\nError: Module not found: Can't resolve '@/components/ui/button'\n\nPlease check your build configuration and try again.",
-    time: "10:51 AM",
-    date: "Today",
-    read: false,
-    starred: true,
-    hasAttachment: false,
-    category: "primary",
-    labels: ["Work"],
-  },
-  {
-    id: "2",
-    from: "LinkedIn Job Alerts",
-    fromEmail: "jobalerts-noreply@linkedin.com",
-    initials: "L",
-    avatarColor: "#0a66c2",
-    subject: "Javascript Developer - Remote Work at BairesDev",
-    preview:
-      "BairesDev Javascript Developer - Remote Work: At BairesDev, we've been...",
-    body: "BairesDev Javascript Developer - Remote Work\n\nAt BairesDev, we've been leading the way in technology projects for over 15 years. We deliver cutting-edge solutions to giants like Google and the most innovative startups in Silicon Valley.\n\nApply now to join our team.",
-    time: "10:50 AM",
-    date: "Today",
-    read: false,
-    starred: false,
-    hasAttachment: false,
-    category: "primary",
-    labels: [],
-  },
-  {
-    id: "3",
-    from: "LinkedIn Job Alerts",
-    fromEmail: "jobalerts-noreply@linkedin.com",
-    initials: "L",
-    avatarColor: "#0a66c2",
-    subject: "Frontend Developer Remote at FunEx",
-    preview:
-      "FunEx Frontend Developer Remote: HTML/CSS Developer with React Expertise...",
-    body: "FunEx is hiring a Frontend Developer with React expertise for a remote position. Experience with TypeScript and Next.js is a plus.",
-    time: "8:51 AM",
-    date: "Today",
-    read: true,
-    starred: false,
-    hasAttachment: false,
-    category: "primary",
-    labels: [],
-  },
-  {
-    id: "4",
-    from: "ThemeWagon Team",
-    fromEmail: "team@themewagon.com",
-    initials: "TW",
-    avatarColor: "#7c3aed",
-    subject: "Download link for your theme is arrived!",
-    preview:
-      "Download link for your theme is arrived! Thanks for downloading AIStarterKit...",
-    body: "Thanks for downloading AIStarterKit from ThemeWagon!\n\nYour download link is ready. Click the button below to download your theme files.\n\nIf you have any questions, feel free to reach out to our support team.",
-    time: "10:58 AM",
-    date: "Today",
-    read: true,
-    starred: false,
-    hasAttachment: true,
-    category: "primary",
-    labels: [],
-  },
-  {
-    id: "5",
-    from: "Medium Daily Digest",
-    fromEmail: "noreply@medium.com",
-    initials: "M",
-    avatarColor: "#22c55e",
-    subject:
-      "A Single CLAUDE.md File Went Viral. The Reason Is Embarrassingly Simple.",
-    preview: "Sumit Pandey in T... · Stories for Koushik Karmakar",
-    body: "A Single CLAUDE.md File Went Viral. The Reason Is Embarrassingly Simple.\n\nBy Sumit Pandey\n\nEveryone thought it was about AI. It was actually about communication...",
-    time: "Yesterday",
-    date: "Yesterday",
-    read: true,
-    starred: false,
-    hasAttachment: false,
-    category: "promotions",
-    labels: [],
-  },
-  {
-    id: "6",
-    from: "Naukri Alerts",
-    fromEmail: "alerts@naukri.com",
-    initials: "N",
-    avatarColor: "#f59e0b",
-    subject:
-      "New Developer jobs in Kolkata matching your search - Salary up to Rs 2.1L per month",
-    preview: "+ Developer jobs for you — Apply before positions close...",
-    body: "New Developer jobs in Kolkata matching your search:\n\n1. React Developer - TechCorp (Rs 1.8L - 2.1L)\n2. Full Stack Developer - StartupX (Rs 1.5L - 2.0L)\n3. Frontend Engineer - DigitalCo (Rs 1.2L - 1.8L)",
-    time: "Yesterday",
-    date: "Yesterday",
-    read: true,
-    starred: false,
-    hasAttachment: false,
-    category: "promotions",
-    labels: [],
-  },
-  {
-    id: "7",
-    from: "Google",
-    fromEmail: "no-reply@accounts.google.com",
-    initials: "G",
-    avatarColor: "#4285F4",
-    subject: "You shared some Google Account data with Koushik Karmakar",
-    preview: "Keep track of your Google Account data koushik9339mail@gm...",
-    body: "You recently shared your Google Account data. This email confirms the data sharing that occurred on your account.",
-    time: "3:19 AM",
-    date: "Today",
-    read: true,
-    starred: false,
-    hasAttachment: false,
-    category: "primary",
-    labels: [],
-  },
-  {
-    id: "8",
-    from: "Grammarly Insights",
-    fromEmail: "insights@grammarly.com",
-    initials: "GR",
-    avatarColor: "#15b097",
-    subject: "A week without words?",
-    preview:
-      "There wasn't any writing activity last week. Get back to writing...",
-    body: "It looks like you didn't use Grammarly last week. Writing is a skill that improves with practice — we're here whenever you're ready.",
-    time: "11:58 PM",
-    date: "Yesterday",
-    read: true,
-    starred: false,
-    hasAttachment: false,
-    category: "promotions",
-    labels: [],
-  },
-  {
-    id: "9",
-    from: "Freshersworld",
-    fromEmail: "noreply@freshersworld.com",
-    initials: "FW",
-    avatarColor: "#ec4899",
-    subject: "Update your Job Profile on Freshersworld",
-    preview:
-      "Dear KoushikKarmakar, Your profile completion percentage score is 18%...",
-    body: "Dear KoushikKarmakar,\n\nYour profile completion percentage score is 18%. Complete your profile to get better job matches and increase your chances of getting hired.",
-    time: "5:40 AM",
-    date: "Today",
-    read: true,
-    starred: false,
-    hasAttachment: false,
-    category: "promotions",
-    labels: [],
-  },
-  {
-    id: "10",
-    from: "Jens.. sapidin1",
-    fromEmail: "sapidin1@github.com",
-    initials: "JS",
-    avatarColor: "#8b5cf6",
-    subject:
-      "Re: [community/community] Issue fields: Structured issue metadata is in public preview",
-    preview: "I had to... — Discussion #189141 in GitHub Community",
-    body: "I had to chime in here because this feature is exactly what I've been waiting for. The structured metadata will make it so much easier to filter and organize issues across large repositories.",
-    time: "8:33 AM",
-    date: "Today",
-    read: false,
-    starred: false,
-    hasAttachment: false,
-    category: "social",
-    labels: [],
-  },
-  {
-    id: "11",
-    from: "Sneha from foundit",
-    fromEmail: "sneha@foundit.in",
-    initials: "SF",
-    avatarColor: "#f97316",
-    subject: "Job recommendations for you | foundit (Monster)",
-    preview:
-      "Top job matching your profile — Koushik Karmakar, check these out...",
-    body: "Hi Koushik Karmakar,\n\nWe've found some jobs that match your profile. Here are our top picks for you this week.",
-    time: "11:58 PM",
-    date: "Yesterday",
-    read: true,
-    starred: false,
-    hasAttachment: false,
-    category: "primary",
-    labels: [],
-  },
-];
+// ─── Constants ────────────────────────────────────────────────────────────────
+const POLL_INTERVAL_MS = 30_000;
+const EMAIL_LIMIT = 10;
 
 const NAV_FOLDERS: {
   id: Folder;
   label: string;
   icon: React.ReactNode;
-  count?: number;
 }[] = [
-  { id: "inbox", label: "Inbox", icon: <Inbox size={15} />, count: 4 },
-  { id: "starred", label: "Starred", icon: <Star size={15} /> },
-  { id: "sent", label: "Sent", icon: <Send size={15} /> },
-  { id: "drafts", label: "Drafts", icon: <Pencil size={15} />, count: 2 },
-  { id: "all", label: "All Mail", icon: <Mail size={15} /> },
-  { id: "spam", label: "Spam", icon: <ArchiveX size={15} /> },
-  { id: "trash", label: "Trash", icon: <Trash2 size={15} /> },
-];
-
+    { id: "inbox", label: "Inbox", icon: <Inbox size={15} /> },
+    { id: "starred", label: "Starred", icon: <Star size={15} /> },
+    { id: "sent", label: "Sent", icon: <Send size={15} /> },
+    { id: "drafts", label: "Drafts", icon: <Pencil size={15} /> },
+    { id: "all", label: "All Mail", icon: <Mail size={15} /> },
+    { id: "spam", label: "Spam", icon: <ArchiveX size={15} /> },
+    { id: "trash", label: "Trash", icon: <Trash2 size={15} /> },
+  ];
 const LABELS = [
   { name: "Work", color: "#3161F8" },
   { name: "Personal", color: "#22c55e" },
@@ -352,7 +147,6 @@ const LABELS = [
 ];
 
 // ─── Compose Modal ────────────────────────────────────────────────────────────
-
 function ComposeModal({
   onClose,
   aiDraft,
@@ -391,7 +185,6 @@ function ComposeModal({
             "0 24px 64px rgba(0,0,0,0.5), 0 0 0 1px rgba(49,97,248,0.1)",
         }}
       >
-        {/* Header */}
         <div
           className="flex items-center justify-between px-4 py-3"
           style={{ borderBottom: "1px solid var(--border-color)" }}
@@ -429,8 +222,6 @@ function ComposeModal({
             </button>
           </div>
         </div>
-
-        {/* Fields */}
         <div
           className="flex flex-col"
           style={{ borderBottom: "1px solid var(--border-color)" }}
@@ -469,8 +260,6 @@ function ComposeModal({
             />
           </div>
         </div>
-
-        {/* Body */}
         <textarea
           value={body}
           onChange={(e) => setBody(e.target.value)}
@@ -478,8 +267,6 @@ function ComposeModal({
           className="flex-1 resize-none bg-transparent px-4 py-3 text-[13px] outline-none"
           style={{ color: "var(--text-primary)", lineHeight: 1.65 }}
         />
-
-        {/* Footer */}
         <div
           className="flex items-center justify-between px-4 py-3"
           style={{ borderTop: "1px solid var(--border-color)" }}
@@ -496,8 +283,7 @@ function ComposeModal({
             className="flex items-center gap-2 rounded-xl px-4 py-2 text-[13px] font-semibold text-white transition-all"
             style={{ background: "#3161F8" }}
           >
-            <SendHorizonal size={13} />
-            Send
+            <SendHorizonal size={13} /> Send
           </button>
         </div>
       </div>
@@ -505,16 +291,23 @@ function ComposeModal({
   );
 }
 
-// ─── Email Detail Panel ───────────────────────────────────────────────────────
-
+// ─── Email Detail View (full panel replacement) ───────────────────────────────
 function EmailDetail({
   email,
-  onClose,
+  onBack,
   onReply,
+  total,
+  currentIndex,
+  onPrev,
+  onNext,
 }: {
   email: Email;
-  onClose: () => void;
+  onBack: () => void;
   onReply: () => void;
+  total: number;
+  currentIndex: number;
+  onPrev: () => void;
+  onNext: () => void;
 }) {
   const [aiSummary, setAiSummary] = useState<string | null>(null);
   const [summarizing, setSummarizing] = useState(false);
@@ -530,41 +323,54 @@ function EmailDetail({
 
   return (
     <div
-      className="flex h-full flex-col"
-      style={{ borderLeft: "1px solid var(--border-color)" }}
+      className="flex flex-col overflow-y-auto"
+      style={{ background: "var(--main-bg)" }}
     >
-      {/* Toolbar */}
+      {/* Fixed toolbar */}
       <div
-        className="flex items-center justify-between px-5 py-3"
+        className="flex flex-shrink-0 items-center justify-between px-5 py-3"
         style={{ borderBottom: "1px solid var(--border-color)" }}
       >
         <div className="flex items-center gap-1">
+          {/* Back to inbox */}
           <button
-            onClick={onClose}
-            className="rounded-lg p-1.5 transition-colors hover:bg-[#1e2636]"
+            onClick={onBack}
+            className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[12px] font-medium transition-colors hover:bg-[rgba(49,97,248,0.08)]"
             style={{ color: "var(--text-muted)" }}
           >
-            <ChevronLeft size={16} />
+            <ChevronLeft size={15} />
+            Inbox
           </button>
+          <div
+            className="mx-1 h-4 w-px"
+            style={{ background: "var(--border-color)" }}
+          />
           <button
-            className="rounded-lg p-1.5 transition-colors hover:bg-[#1e2636]"
+            className="rounded-lg p-1.5 transition-colors hover:bg-[rgba(255,255,255,0.04)]"
             style={{ color: "var(--text-muted)" }}
           >
             <Archive size={15} />
           </button>
           <button
-            className="rounded-lg p-1.5 transition-colors hover:bg-[#1e2636]"
+            className="rounded-lg p-1.5 transition-colors hover:bg-[rgba(255,255,255,0.04)]"
             style={{ color: "var(--text-muted)" }}
           >
             <Trash2 size={15} />
           </button>
           <button
-            className="rounded-lg p-1.5 transition-colors hover:bg-[#1e2636]"
+            className="rounded-lg p-1.5 transition-colors hover:bg-[rgba(255,255,255,0.04)]"
             style={{ color: "var(--text-muted)" }}
           >
             <MailOpen size={15} />
           </button>
+          <button
+            className="rounded-lg p-1.5 transition-colors hover:bg-[rgba(255,255,255,0.04)]"
+            style={{ color: "var(--text-muted)" }}
+          >
+            <Clock size={15} />
+          </button>
         </div>
+
         <div className="flex items-center gap-2">
           <button
             onClick={handleSummarize}
@@ -583,22 +389,49 @@ function EmailDetail({
             )}
             {summarizing ? "Summarizing…" : "AI Summary"}
           </button>
+
+          {/* Pagination */}
+          <div className="flex items-center gap-0.5">
+            <span
+              className="px-1 text-[11px]"
+              style={{ color: "var(--text-muted)" }}
+            >
+              {currentIndex + 1} of {total}
+            </span>
+            <button
+              onClick={onPrev}
+              disabled={currentIndex === 0}
+              className="rounded-lg p-1.5 transition-colors hover:bg-[rgba(255,255,255,0.04)] disabled:opacity-30"
+              style={{ color: "var(--text-muted)" }}
+            >
+              <ChevronLeft size={15} />
+            </button>
+            <button
+              onClick={onNext}
+              disabled={currentIndex === total - 1}
+              className="rounded-lg p-1.5 transition-colors hover:bg-[rgba(255,255,255,0.04)] disabled:opacity-30"
+              style={{ color: "var(--text-muted)" }}
+            >
+              <ChevronRight size={15} />
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Content */}
-      <div className="flex-1 overflow-y-auto px-6 py-5">
+      {/* Scrollable email content */}
+      <div className="flex-1 overflow-y-auto px-8 py-6">
+        {/* Subject */}
         <h2
-          className="mb-4 text-[18px] font-bold leading-snug"
+          className="mb-5 text-[22px] font-bold leading-snug"
           style={{ color: "var(--text-primary)" }}
         >
           {email.subject}
         </h2>
 
-        {/* Sender info */}
-        <div className="mb-5 flex items-start gap-3">
+        {/* Sender row */}
+        <div className="mb-6 flex items-start gap-3">
           <div
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[12px] font-bold text-white"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[12px] font-bold text-white"
             style={{ background: email.avatarColor }}
           >
             {email.initials}
@@ -607,27 +440,45 @@ function EmailDetail({
             <div className="flex items-center justify-between gap-4">
               <div>
                 <span
-                  className="text-[13px] font-semibold"
+                  className="text-[14px] font-semibold"
                   style={{ color: "var(--text-primary)" }}
                 >
                   {email.from}
                 </span>
                 <span
-                  className="ml-2 text-[11px]"
+                  className="ml-2 text-[12px]"
                   style={{ color: "var(--text-muted)" }}
                 >
                   &lt;{email.fromEmail}&gt;
                 </span>
               </div>
-              <span
-                className="shrink-0 text-[11px]"
-                style={{ color: "var(--text-muted)" }}
-              >
-                {email.date} · {email.time}
-              </span>
+              <div className="flex shrink-0 items-center gap-2">
+                <span
+                  className="text-[12px]"
+                  style={{ color: "var(--text-muted)" }}
+                >
+                  {email.date} · {email.time}
+                </span>
+                <button
+                  className="rounded-lg p-1 transition-colors hover:bg-[rgba(255,255,255,0.04)]"
+                  style={{ color: "var(--text-muted)" }}
+                >
+                  <Star
+                    size={14}
+                    fill={email.starred ? "#f59e0b" : "none"}
+                    color={email.starred ? "#f59e0b" : "currentColor"}
+                  />
+                </button>
+                <button
+                  className="rounded-lg p-1 transition-colors hover:bg-[rgba(255,255,255,0.04)]"
+                  style={{ color: "var(--text-muted)" }}
+                >
+                  <Reply size={14} />
+                </button>
+              </div>
             </div>
             <span
-              className="text-[11px]"
+              className="text-[12px]"
               style={{ color: "var(--text-muted)" }}
             >
               to me
@@ -635,10 +486,10 @@ function EmailDetail({
           </div>
         </div>
 
-        {/* AI Summary */}
+        {/* AI Summary box */}
         {aiSummary && (
           <div
-            className="mb-5 rounded-xl p-4"
+            className="mb-6 rounded-xl p-4"
             style={{
               background: "rgba(49,97,248,0.06)",
               border: "1px solid rgba(49,97,248,0.2)",
@@ -662,25 +513,28 @@ function EmailDetail({
           </div>
         )}
 
-        {/* Body */}
+        {/* Divider */}
         <div
-          className="text-[13px] leading-relaxed"
-          style={{
-            color: "var(--text-secondary)",
-            whiteSpace: "pre-line",
-          }}
+          className="mb-6"
+          style={{ height: 1, background: "var(--border-color)" }}
+        />
+
+        {/* Email body */}
+        <div
+          className="text-[14px] leading-relaxed"
+          style={{ color: "var(--text-secondary)", whiteSpace: "pre-line" }}
         >
           {email.body}
         </div>
       </div>
 
-      {/* Reply bar */}
+      {/* Fixed reply bar */}
       <div
-        className="px-5 py-4"
+        className="flex-shrink-0 px-8 py-4"
         style={{ borderTop: "1px solid var(--border-color)" }}
       >
         <div
-          className="flex cursor-text items-center gap-3 rounded-xl px-4 py-3"
+          className="flex cursor-text items-center gap-3 rounded-xl px-4 py-3 transition-colors"
           style={{
             border: "1px solid var(--border-color)",
             background: "var(--input-bg)",
@@ -688,19 +542,27 @@ function EmailDetail({
           onClick={onReply}
         >
           <Reply size={14} style={{ color: "var(--text-muted)" }} />
-          <span className="text-[13px]" style={{ color: "var(--text-muted)" }}>
+          <span
+            className="flex-1 text-[13px]"
+            style={{ color: "var(--text-muted)" }}
+          >
             Reply to {email.from}…
           </span>
-          <div className="ml-auto flex items-center gap-1">
+          <div className="flex items-center gap-1">
             <button
-              className="rounded-lg p-1.5 transition-colors hover:bg-[#1e2636]"
+              className="rounded-lg p-1.5 transition-colors hover:bg-[rgba(255,255,255,0.06)]"
               style={{ color: "var(--text-muted)" }}
+              onClick={(e) => {
+                e.stopPropagation();
+                onReply();
+              }}
             >
               <Reply size={13} />
             </button>
             <button
-              className="rounded-lg p-1.5 transition-colors hover:bg-[#1e2636]"
+              className="rounded-lg p-1.5 transition-colors hover:bg-[rgba(255,255,255,0.06)]"
               style={{ color: "var(--text-muted)" }}
+              onClick={(e) => e.stopPropagation()}
             >
               <ReplyAll size={13} />
             </button>
@@ -712,7 +574,6 @@ function EmailDetail({
 }
 
 // ─── Email Row ────────────────────────────────────────────────────────────────
-
 function EmailRow({
   email,
   selected,
@@ -804,7 +665,6 @@ function EmailRow({
         >
           {email.from}
         </span>
-
         <div className="flex min-w-0 flex-1 items-center gap-1.5">
           <span
             className="shrink-0 text-[13px]"
@@ -861,28 +721,22 @@ function EmailRow({
             style={{ opacity: hovered ? 1 : 0, transition: "opacity 0.15s" }}
           >
             <button
-              onClick={(e) => {
-                e.stopPropagation();
-              }}
-              className="rounded p-1 transition-colors hover:bg-[#1e2636]"
+              onClick={(e) => e.stopPropagation()}
+              className="rounded p-1 transition-colors hover:bg-[rgba(255,255,255,0.06)]"
               style={{ color: "var(--text-muted)" }}
             >
               <Archive size={13} />
             </button>
             <button
-              onClick={(e) => {
-                e.stopPropagation();
-              }}
-              className="rounded p-1 transition-colors hover:bg-[#1e2636]"
+              onClick={(e) => e.stopPropagation()}
+              className="rounded p-1 transition-colors hover:bg-[rgba(255,255,255,0.06)]"
               style={{ color: "var(--text-muted)" }}
             >
               <Clock size={13} />
             </button>
             <button
-              onClick={(e) => {
-                e.stopPropagation();
-              }}
-              className="rounded p-1 transition-colors hover:bg-[#1e2636]"
+              onClick={(e) => e.stopPropagation()}
+              className="rounded p-1 transition-colors hover:bg-[rgba(255,255,255,0.06)]"
               style={{ color: "var(--text-muted)" }}
             >
               <Trash2 size={13} />
@@ -895,32 +749,31 @@ function EmailRow({
 }
 
 // ─── Sidebar ──────────────────────────────────────────────────────────────────
-
 function Sidebar({
   activeFolder,
   onFolderChange,
   onCompose,
+  inboxUnreadCount,
 }: {
   activeFolder: Folder;
   onFolderChange: (f: Folder) => void;
   onCompose: () => void;
+  inboxUnreadCount: number;
 }) {
-  const { user } = useAuth();
-
   return (
+    // height: 100% fills the parent which is calc(100vh - topnav)
     <aside
-      className="flex h-[calc(100%-60px)] flex-col"
+      className="flex flex-col"
       style={{
         width: 220,
+        flexShrink: 0,
         background: "var(--sidebar-bg)",
         borderRight: "1px solid var(--border-color)",
-        flexShrink: 0,
+        height: "100%",
       }}
     >
-      {/* Logo */}
-
       {/* Compose */}
-      <div className="px-4 py-3">
+      <div className="flex-shrink-0 px-4 py-3">
         <button
           onClick={onCompose}
           className="flex w-full items-center gap-2.5 rounded-xl px-4 py-2.5 text-[13px] font-semibold text-white transition-all"
@@ -929,13 +782,12 @@ function Sidebar({
             boxShadow: "0 4px 14px rgba(49,97,248,0.3)",
           }}
         >
-          <Edit3 size={14} />
-          Compose
+          <Edit3 size={14} /> Compose
         </button>
       </div>
 
-      {/* Nav */}
-      <nav className="flex flex-col gap-0.5 px-3 py-1">
+      {/* Nav — scrollable if many folders */}
+      <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto px-3 py-1">
         {NAV_FOLDERS.map((folder) => (
           <button
             key={folder.id}
@@ -961,7 +813,7 @@ function Sidebar({
               {folder.icon}
             </span>
             <span className="flex-1">{folder.label}</span>
-            {folder.count ? (
+            {folder.id === "inbox" && inboxUnreadCount > 0 ? (
               <span
                 className="rounded-full px-1.5 py-0.5 text-[10px] font-bold"
                 style={{
@@ -971,32 +823,316 @@ function Sidebar({
                     activeFolder === folder.id ? "white" : "var(--text-muted)",
                 }}
               >
-                {folder.count}
+                {inboxUnreadCount}
               </span>
             ) : null}
           </button>
         ))}
       </nav>
-
-      {/* Divider */}
-      <div
-        className="mx-4 my-2"
-        style={{ height: 1, background: "var(--border-color)" }}
-      />
     </aside>
   );
 }
 
-// ─── Page ─────────────────────────────────────────────────────────────────────
+// ─── Email List View ──────────────────────────────────────────────────────────
+function EmailListView({
+  filtered,
+  activeTab,
+  setActiveTab,
+  checkedIds,
+  selectedEmailId,
+  onEmailClick,
+  onCheck,
+  onStar,
+  onClearChecked,
+  emails,
+  searchQuery,
+  isLoading,
+  error,
+}: {
+  filtered: Email[];
+  activeTab: Tab;
+  setActiveTab: (t: Tab) => void;
+  checkedIds: Set<string>;
+  selectedEmailId: string | null;
+  onEmailClick: (email: Email) => void;
+  onCheck: (id: string, e: React.MouseEvent) => void;
+  onStar: (id: string, e: React.MouseEvent) => void;
+  onClearChecked: () => void;
+  emails: Email[];
+  searchQuery: string;
+  isLoading: boolean;
+  error: string | null;
+}) {
+  const TABS: {
+    id: Tab;
+    label: string;
+    icon: React.ReactNode;
+    count?: number;
+  }[] = [
+      {
+        id: "primary",
+        label: "Primary",
+        icon: <Inbox size={14} />,
+        count:
+          emails.filter((e) => e.category === "primary" && !e.read).length ||
+          undefined,
+      },
+      { id: "promotions", label: "Promotions", icon: <Tag size={14} /> },
+      { id: "social", label: "Social", icon: <Users size={14} /> },
+    ];
 
+  return (
+    <div
+      className="flex h-full flex-col"
+      style={{ background: "var(--main-bg)" }}
+    >
+      {/* Fixed tabs bar */}
+      <div
+        className="flex flex-shrink-0 items-center gap-0 px-2"
+        style={{ borderBottom: "1px solid var(--border-color)" }}
+      >
+        {TABS.map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            className="relative flex items-center gap-2 px-4 py-3 text-[13px] font-medium transition-colors"
+            style={{
+              color: activeTab === tab.id ? "#3161F8" : "var(--text-muted)",
+              borderBottom:
+                activeTab === tab.id
+                  ? "2px solid #3161F8"
+                  : "2px solid transparent",
+            }}
+          >
+            <span
+              style={{
+                color: activeTab === tab.id ? "#3161F8" : "var(--text-muted)",
+              }}
+            >
+              {tab.icon}
+            </span>
+            {tab.label}
+            {tab.count ? (
+              <span
+                className="rounded-full px-1.5 py-0.5 text-[10px] font-bold"
+                style={{
+                  background:
+                    activeTab === tab.id ? "#3161F8" : "var(--badge-bg)",
+                  color: activeTab === tab.id ? "white" : "var(--text-muted)",
+                }}
+              >
+                {tab.count}
+              </span>
+            ) : null}
+          </button>
+        ))}
+
+        <div className="ml-auto flex items-center gap-1 pr-2">
+          <span className="text-[11px]" style={{ color: "var(--text-muted)" }}>
+            1–{filtered.length} of {filtered.length}
+          </span>
+          <button
+            className="rounded p-1 transition-colors hover:bg-[rgba(255,255,255,0.04)]"
+            style={{ color: "var(--text-muted)" }}
+          >
+            <ChevronLeft size={14} />
+          </button>
+          <button
+            className="rounded p-1 transition-colors hover:bg-[rgba(255,255,255,0.04)]"
+            style={{ color: "var(--text-muted)" }}
+          >
+            <ChevronRight size={14} />
+          </button>
+        </div>
+      </div>
+
+      {/* Fixed checked-items action bar */}
+      {checkedIds.size > 0 && (
+        <div
+          className="flex flex-shrink-0 items-center gap-2 px-4 py-2"
+          style={{
+            borderBottom: "1px solid var(--border-color)",
+            background: "rgba(49,97,248,0.05)",
+          }}
+        >
+          <span
+            className="text-[12px] font-medium"
+            style={{ color: "var(--text-primary)" }}
+          >
+            {checkedIds.size} selected
+          </span>
+          <div className="ml-2 flex items-center gap-1">
+            <button
+              className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] transition-colors hover:bg-[rgba(255,255,255,0.06)]"
+              style={{ color: "var(--text-muted)" }}
+            >
+              <Archive size={12} /> Archive
+            </button>
+            <button
+              className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] transition-colors hover:bg-[rgba(255,255,255,0.06)]"
+              style={{ color: "var(--text-muted)" }}
+            >
+              <Trash2 size={12} /> Delete
+            </button>
+            <button
+              className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] transition-colors hover:bg-[rgba(255,255,255,0.06)]"
+              style={{ color: "var(--text-muted)" }}
+            >
+              <MailOpen size={12} /> Mark read
+            </button>
+          </div>
+          <button
+            className="ml-auto rounded-lg p-1 transition-colors hover:bg-[rgba(255,255,255,0.06)]"
+            onClick={onClearChecked}
+            style={{ color: "var(--text-muted)" }}
+          >
+            <X size={13} />
+          </button>
+        </div>
+      )}
+
+      {/* ONLY this area scrolls */}
+      <div className="flex-1 overflow-y-auto">
+        {isLoading ? (
+          <div className="flex flex-col items-center justify-center gap-3 py-24">
+            <Loader2
+              size={32}
+              className="animate-spin"
+              style={{ color: "var(--text-muted)", opacity: 0.6 }}
+            />
+            <p className="text-[13px]" style={{ color: "var(--text-muted)" }}>
+              Loading your inbox…
+            </p>
+          </div>
+        ) : error ? (
+          <div className="flex flex-col items-center justify-center gap-3 px-6 py-24 text-center">
+            <p className="text-[13px]" style={{ color: "#ef4444" }}>
+              {error}
+            </p>
+            <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>
+              Try refreshing or log out and sign in again to grant Gmail access.
+            </p>
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="flex flex-col items-center justify-center gap-3 py-24">
+            <RotateCcw
+              size={32}
+              style={{ color: "var(--text-muted)", opacity: 0.4 }}
+            />
+            <p className="text-[13px]" style={{ color: "var(--text-muted)" }}>
+              {searchQuery ? "No results found" : "No messages here"}
+            </p>
+          </div>
+        ) : (
+          filtered.map((email) => (
+            <EmailRow
+              key={email.id}
+              email={email}
+              selected={selectedEmailId === email.id}
+              checked={checkedIds.has(email.id)}
+              onClick={() => onEmailClick(email)}
+              onCheck={(e) => onCheck(email.id, e)}
+              onStar={(e) => onStar(email.id, e)}
+            />
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
 export default function EmailPage() {
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
   const [activeFolder, setActiveFolder] = useState<Folder>("inbox");
   const [activeTab, setActiveTab] = useState<Tab>("primary");
   const [selectedEmail, setSelectedEmail] = useState<Email | null>(null);
   const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set());
   const [composing, setComposing] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [emails, setEmails] = useState<Email[]>(EMAILS);
+  const [emails, setEmails] = useState<Email[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const initialSyncDone = useRef(false);
+
+  const fetchEmails = useCallback(async () => {
+    if (!isAuthenticated) return;
+
+    try {
+      const { data } = await api.get<{
+        success: boolean;
+        data: { emails: Email[] };
+      }>("/gmail/messages", {
+        params: {
+          limit: EMAIL_LIMIT,
+          folder: activeFolder,
+          category: activeTab,
+        },
+      });
+
+      setEmails(data.data.emails);
+      setError(null);
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Failed to load emails";
+      setError(message);
+    }
+  }, [isAuthenticated, activeFolder, activeTab]);
+
+  const syncGmail = useCallback(
+    async (showSpinner = true) => {
+      if (!isAuthenticated) return;
+
+      if (showSpinner) setIsSyncing(true);
+      try {
+        await api.post("/gmail/sync", null, {
+          params: { limit: EMAIL_LIMIT },
+        });
+        await fetchEmails();
+        setError(null);
+      } catch (err: unknown) {
+        const axiosErr = err as {
+          response?: { data?: { message?: string } };
+        };
+        const message =
+          axiosErr.response?.data?.message ??
+          (err instanceof Error ? err.message : "Failed to sync Gmail");
+        setError(message);
+      } finally {
+        if (showSpinner) setIsSyncing(false);
+        setIsLoading(false);
+      }
+    },
+    [isAuthenticated, fetchEmails],
+  );
+
+  // Initial load: sync from Gmail then show DB data
+  useEffect(() => {
+    if (authLoading || !isAuthenticated || initialSyncDone.current) return;
+    initialSyncDone.current = true;
+    void syncGmail(true);
+  }, [authLoading, isAuthenticated, syncGmail]);
+
+  // Refetch from DB when folder/tab changes (no Gmail API call)
+  useEffect(() => {
+    if (!isAuthenticated || !initialSyncDone.current) return;
+    setIsLoading(true);
+    void fetchEmails().finally(() => setIsLoading(false));
+  }, [isAuthenticated, activeFolder, activeTab, fetchEmails]);
+
+  // Poll Gmail every 30s for near-real-time updates
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    const interval = setInterval(() => {
+      void syncGmail(false);
+    }, POLL_INTERVAL_MS);
+
+    return () => clearInterval(interval);
+  }, [isAuthenticated, syncGmail]);
+
+  const inboxUnreadCount = emails.filter((e) => !e.read).length;
 
   const filtered = emails.filter(
     (e) =>
@@ -1006,7 +1142,9 @@ export default function EmailPage() {
         e.from.toLowerCase().includes(searchQuery.toLowerCase())),
   );
 
-  const unreadCount = filtered.filter((e) => !e.read).length;
+  const selectedIndex = selectedEmail
+    ? filtered.findIndex((e) => e.id === selectedEmail.id)
+    : -1;
 
   const toggleCheck = (id: string, ev: React.MouseEvent) => {
     ev.stopPropagation();
@@ -1031,35 +1169,17 @@ export default function EmailPage() {
     );
   };
 
-  const TABS: {
-    id: Tab;
-    label: string;
-    icon: React.ReactNode;
-    count?: number;
-  }[] = [
-    {
-      id: "primary",
-      label: "Primary",
-      icon: <Inbox size={14} />,
-      count:
-        emails.filter((e) => e.category === "primary" && !e.read).length ||
-        undefined,
-    },
-    {
-      id: "promotions",
-      label: "Promotions",
-      icon: <Tag size={14} />,
-    },
-    {
-      id: "social",
-      label: "Social",
-      icon: <Users size={14} />,
-    },
-  ];
+  const handleBack = () => setSelectedEmail(null);
+  const handlePrev = () => {
+    if (selectedIndex > 0) setSelectedEmail(filtered[selectedIndex - 1]!);
+  };
+  const handleNext = () => {
+    if (selectedIndex < filtered.length - 1)
+      setSelectedEmail(filtered[selectedIndex + 1]!);
+  };
 
   return (
     <>
-      {/* CSS variables for light/dark */}
       <style>{`
         :root {
           --sidebar-bg: #0f1623;
@@ -1075,7 +1195,6 @@ export default function EmailPage() {
           --row-unread: rgba(49,97,248,0.04);
           --badge-bg: #1e2636;
           --input-bg: #0d1117;
-          --tab-active-bg: rgba(49,97,248,0.1);
           --search-bg: #161b22;
         }
         .dark {
@@ -1092,7 +1211,6 @@ export default function EmailPage() {
           --row-unread: rgba(49,97,248,0.04);
           --badge-bg: #1e2636;
           --input-bg: #0d1117;
-          --tab-active-bg: rgba(49,97,248,0.1);
           --search-bg: #161b22;
         }
         html.light, .light {
@@ -1109,29 +1227,32 @@ export default function EmailPage() {
           --row-unread: rgba(49,97,248,0.05);
           --badge-bg: #e2e8f0;
           --input-bg: #f8fafc;
-          --tab-active-bg: rgba(49,97,248,0.08);
           --search-bg: #f1f5f9;
         }
       `}</style>
 
       <div
-        className="flex h-full overflow-hidden"
+        className="flex h-screen overflow-hidden"
         style={{ background: "var(--main-bg)" }}
       >
+        {/* ── Sidebar — fixed height, does not scroll the page ── */}
         <Sidebar
           activeFolder={activeFolder}
-          onFolderChange={setActiveFolder}
+          onFolderChange={(f) => {
+            setActiveFolder(f);
+            setSelectedEmail(null);
+          }}
           onCompose={() => setComposing(true)}
+          inboxUnreadCount={inboxUnreadCount}
         />
 
-        {/* Main area */}
+        {/* ── Main column — flex column, fills remaining width ── */}
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-          {/* Top bar */}
+          {/* Fixed top search bar */}
           <div
-            className="flex items-center gap-3 px-5 py-3"
+            className="flex flex-shrink-0 items-center gap-3 px-5 py-3"
             style={{ borderBottom: "1px solid var(--border-color)" }}
           >
-            {/* Search */}
             <div
               className="flex flex-1 items-center gap-2.5 rounded-xl px-4 py-2"
               style={{
@@ -1157,196 +1278,59 @@ export default function EmailPage() {
                 </button>
               )}
             </div>
-
             <div className="ml-auto flex items-center gap-2">
+              <ThemeToggle />
               <button
-                className="rounded-lg p-2 transition-colors hover:bg-[#1e2636]"
+                onClick={() => void syncGmail(true)}
+                disabled={isSyncing}
+                className="rounded-lg p-2 transition-colors hover:bg-[rgba(255,255,255,0.04)] disabled:opacity-50"
                 style={{ color: "var(--text-muted)" }}
+                title="Sync from Gmail"
               >
-                <RefreshCw size={15} />
+                <RefreshCw
+                  size={15}
+                  className={isSyncing ? "animate-spin" : undefined}
+                />
               </button>
             </div>
           </div>
 
-          {/* Email list + detail split */}
-          <div className="flex min-h-0 flex-1">
-            {/* List panel */}
-            <div
-              className="flex flex-col"
-              style={{
-                width: selectedEmail ? 480 : "100%",
-                flexShrink: 0,
-                borderRight: selectedEmail
-                  ? "1px solid var(--border-color)"
-                  : "none",
-                transition: "width 0.2s",
-              }}
-            >
-              {/* Tabs */}
-              <div
-                className="flex items-center gap-0 px-2"
-                style={{ borderBottom: "1px solid var(--border-color)" }}
-              >
-                {TABS.map((tab) => (
-                  <button
-                    key={tab.id}
-                    onClick={() => setActiveTab(tab.id)}
-                    className="relative flex items-center gap-2 px-4 py-3 text-[13px] font-medium transition-colors"
-                    style={{
-                      color:
-                        activeTab === tab.id ? "#3161F8" : "var(--text-muted)",
-                      borderBottom:
-                        activeTab === tab.id
-                          ? "2px solid #3161F8"
-                          : "2px solid transparent",
-                    }}
-                  >
-                    <span
-                      style={{
-                        color:
-                          activeTab === tab.id
-                            ? "#3161F8"
-                            : "var(--text-muted)",
-                      }}
-                    >
-                      {tab.icon}
-                    </span>
-                    {tab.label}
-                    {tab.count ? (
-                      <span
-                        className="rounded-full px-1.5 py-0.5 text-[10px] font-bold"
-                        style={{
-                          background:
-                            activeTab === tab.id
-                              ? "#3161F8"
-                              : "var(--badge-bg)",
-                          color:
-                            activeTab === tab.id
-                              ? "white"
-                              : "var(--text-muted)",
-                        }}
-                      >
-                        {tab.count}
-                      </span>
-                    ) : null}
-                  </button>
-                ))}
-
-                {/* Toolbar right */}
-                <div className="ml-auto flex items-center gap-1 pr-2">
-                  <span
-                    className="text-[11px]"
-                    style={{ color: "var(--text-muted)" }}
-                  >
-                    1–{filtered.length} of {filtered.length}
-                  </span>
-                  <button
-                    className="rounded p-1 transition-colors hover:bg-[#1e2636]"
-                    style={{ color: "var(--text-muted)" }}
-                  >
-                    <ChevronLeft size={14} />
-                  </button>
-                  <button
-                    className="rounded p-1 transition-colors hover:bg-[#1e2636]"
-                    style={{ color: "var(--text-muted)" }}
-                  >
-                    <ChevronRight size={14} />
-                  </button>
-                </div>
-              </div>
-
-              {/* Select all / actions bar */}
-              {checkedIds.size > 0 && (
-                <div
-                  className="flex items-center gap-2 px-4 py-2"
-                  style={{
-                    borderBottom: "1px solid var(--border-color)",
-                    background: "rgba(49,97,248,0.05)",
-                  }}
-                >
-                  <span
-                    className="text-[12px] font-medium"
-                    style={{ color: "var(--text-primary)" }}
-                  >
-                    {checkedIds.size} selected
-                  </span>
-                  <div className="ml-2 flex items-center gap-1">
-                    <button
-                      className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] transition-colors hover:bg-[#1e2636]"
-                      style={{ color: "var(--text-muted)" }}
-                    >
-                      <Archive size={12} /> Archive
-                    </button>
-                    <button
-                      className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] transition-colors hover:bg-[#1e2636]"
-                      style={{ color: "var(--text-muted)" }}
-                    >
-                      <Trash2 size={12} /> Delete
-                    </button>
-                    <button
-                      className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] transition-colors hover:bg-[#1e2636]"
-                      style={{ color: "var(--text-muted)" }}
-                    >
-                      <MailOpen size={12} /> Mark read
-                    </button>
-                  </div>
-                  <button
-                    className="ml-auto rounded-lg p-1 transition-colors hover:bg-[#1e2636]"
-                    onClick={() => setCheckedIds(new Set())}
-                    style={{ color: "var(--text-muted)" }}
-                  >
-                    <X size={13} />
-                  </button>
-                </div>
-              )}
-
-              {/* Email rows */}
-              <div className="flex-1 overflow-y-auto">
-                {filtered.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center gap-3 py-24">
-                    <RotateCcw
-                      size={32}
-                      style={{ color: "var(--text-muted)", opacity: 0.4 }}
-                    />
-                    <p
-                      className="text-[13px]"
-                      style={{ color: "var(--text-muted)" }}
-                    >
-                      {searchQuery ? "No results found" : "No messages here"}
-                    </p>
-                  </div>
-                ) : (
-                  filtered.map((email) => (
-                    <EmailRow
-                      key={email.id}
-                      email={email}
-                      selected={selectedEmail?.id === email.id}
-                      checked={checkedIds.has(email.id)}
-                      onClick={() => handleEmailClick(email)}
-                      onCheck={(e) => toggleCheck(email.id, e)}
-                      onStar={(e) => toggleStar(email.id, e)}
-                    />
-                  ))
-                )}
-              </div>
-            </div>
-
-            {/* Detail panel */}
-            {selectedEmail && (
-              <div className="min-w-0 flex-1">
-                <EmailDetail
-                  email={selectedEmail}
-                  onClose={() => setSelectedEmail(null)}
-                  onReply={() => setComposing(true)}
-                />
-              </div>
+          {/* Content area — either list or detail, fills remaining space */}
+          <div className="min-h-0 flex-1 overflow-hidden">
+            {selectedEmail ? (
+              /* Email detail replaces the list completely */
+              <EmailDetail
+                email={selectedEmail}
+                onBack={handleBack}
+                onReply={() => setComposing(true)}
+                total={filtered.length}
+                currentIndex={selectedIndex}
+                onPrev={handlePrev}
+                onNext={handleNext}
+              />
+            ) : (
+              /* Email list with tabs */
+              <EmailListView
+                filtered={filtered}
+                activeTab={activeTab}
+                setActiveTab={setActiveTab}
+                checkedIds={checkedIds}
+                selectedEmailId={selectedEmail}
+                onEmailClick={handleEmailClick}
+                onCheck={toggleCheck}
+                onStar={toggleStar}
+                onClearChecked={() => setCheckedIds(new Set())}
+                emails={emails}
+                searchQuery={searchQuery}
+                isLoading={isLoading}
+                error={error}
+              />
             )}
           </div>
         </div>
-
-        {/* Compose modal */}
-        {composing && <ComposeModal onClose={() => setComposing(false)} />}
       </div>
+
+      {composing && <ComposeModal onClose={() => setComposing(false)} />}
     </>
   );
 }

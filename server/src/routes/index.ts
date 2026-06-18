@@ -1,5 +1,6 @@
 import { Router, type Request, type Response } from "express";
 import authRoutes from "./auth.routes.js";
+import gmailRoutes from "./gmail.routes.js";
 
 // ─────────────────────────────────────────────
 // ROOT API ROUTER
@@ -27,9 +28,9 @@ router.get("/health", (_req: Request, res: Response) => {
 
 // ── Sub-routes ───────────────────────────────
 router.use("/auth", authRoutes);
+router.use("/gmail", gmailRoutes);
 
 // More routes will be added here:
-// router.use("/gmail", gmailRoutes);
 // router.use("/calendar", calendarRoutes);
 // router.use("/agent", agentRoutes);
 // router.use("/webhook", webhookRoutes);

@@ -18,8 +18,12 @@ export type RefreshUserResult =
   | { ok: true }
   | { ok: false; error: string };
 
+export type LoginResult =
+  | { ok: true }
+  | { ok: false; error: string };
+
 interface AuthContextValue extends AuthState {
-  login: () => void;
+  login: () => Promise<LoginResult>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<RefreshUserResult>;
 }
@@ -115,16 +119,65 @@ export function AuthProvider({ children }: { children: ReactNode }) {
    * (it cannot be done via fetch/XHR), so this performs a full redirect
    * to the backend, which in turn redirects to Google's consent screen.
    *
+   * We preflight with fetch + redirect:"manual" first so rate-limit (429)
+   * responses stay on the login page instead of showing raw JSON.
+   *
    * Flow:
-   *   1. Browser → GET {API_URL}/auth/google
+   *   1. Browser → GET {API_URL}/auth/google (preflight)
    *   2. Backend  → redirect → Google consent screen
    *   3. Google   → redirect → GET {API_URL}/auth/google/callback
    *   4. Backend  → sets refreshToken cookie, redirects to
    *                  {FRONTEND_URL}/auth/success#token=...&expiresIn=...
    *   5. /auth/success page stores the access token and calls refreshUser()
    */
-  const login = useCallback(async () => {
-    window.location.href = `${API_URL}/auth/google`;
+  const login = useCallback(async (): Promise<LoginResult> => {
+    try {
+      const response = await fetch(`${API_URL}/auth/google`, {
+        method: "GET",
+        credentials: "include",
+        redirect: "manual",
+      });
+
+      if (response.status === 429) {
+        const data = (await response.json()) as { message?: string };
+        return {
+          ok: false,
+          error:
+            data.message ??
+            "Too many authentication attempts, please wait 15 minutes before trying again",
+        };
+      }
+
+      if (
+        response.status === 0 ||
+        response.type === "opaqueredirect" ||
+        (response.status >= 300 && response.status < 400)
+      ) {
+        const location = response.headers.get("Location");
+        window.location.href = location ?? `${API_URL}/auth/google`;
+        return { ok: true };
+      }
+
+      if (!response.ok) {
+        let message = "Unable to start Google sign-in. Please try again.";
+        try {
+          const data = (await response.json()) as { message?: string };
+          if (data.message) message = data.message;
+        } catch {
+          // ignore JSON parse errors
+        }
+        return { ok: false, error: message };
+      }
+
+      window.location.href = `${API_URL}/auth/google`;
+      return { ok: true };
+    } catch {
+      return {
+        ok: false,
+        error:
+          "Could not reach the server. Please check that the backend is running and try again.",
+      };
+    }
   }, []);
 
   const logout = useCallback(async () => {

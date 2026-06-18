@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  AlertTriangle,
   ArrowLeft,
   Calendar,
   CheckCircle2,
@@ -8,6 +9,7 @@ import {
   Mail,
   Mic,
   Shield,
+  X,
   Zap,
 } from "lucide-react";
 import Link from "next/link";
@@ -25,13 +27,15 @@ const PERKS = [
 export default function LoginPage() {
   const { login } = useAuth();
   const [signing, setSigning] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleGoogleLogin = async () => {
     setSigning(true);
-    try {
-      await login();
-      // router.push("/dashboard");
-    } catch {
+    setError(null);
+
+    const result = await login();
+    if (!result.ok) {
+      setError(result.error);
       setSigning(false);
     }
   };
@@ -167,6 +171,35 @@ export default function LoginPage() {
             <p className="mb-8 text-center text-[13px] text-[#4d5d78]">
               Sign in to access your AI-powered inbox
             </p>
+
+            {error && (
+              <div
+                role="alert"
+                className="mb-6 flex gap-3 rounded-2xl border border-red-500/25 bg-red-500/10 p-4"
+              >
+                <AlertTriangle
+                  size={18}
+                  className="mt-0.5 shrink-0 text-red-400"
+                  aria-hidden="true"
+                />
+                <div className="min-w-0 flex-1">
+                  <p className="text-[13px] font-semibold text-red-300">
+                    Sign-in temporarily blocked
+                  </p>
+                  <p className="mt-1 text-[12px] leading-relaxed text-red-400/90">
+                    {error}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setError(null)}
+                  aria-label="Dismiss error"
+                  className="shrink-0 rounded-lg p-1 text-red-400/70 transition-colors hover:bg-red-500/10 hover:text-red-300"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            )}
 
             {/* Google button */}
             <button

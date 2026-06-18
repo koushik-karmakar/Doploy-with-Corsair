@@ -7,6 +7,7 @@ import { eq, and, lt } from "drizzle-orm";
 import { env } from "../env.js";
 import { Logger } from "../utils/logger.js";
 import { Encryption } from "../utils/encryption.js";
+import { getSystemHttpsAgent } from "../utils/https-agent.js";
 import {
   GoogleAuthError,
   UnauthorizedError,
@@ -60,22 +61,30 @@ export class AuthService {
     "openid",
     "email",
     "profile",
-    "https://www.googleapis.com/auth/gmail.modify",
-    "https://www.googleapis.com/auth/gmail.send",
-    "https://www.googleapis.com/auth/gmail.readonly",
-    "https://www.googleapis.com/auth/gmail.labels",
-    "https://www.googleapis.com/auth/calendar",
-    "https://www.googleapis.com/auth/calendar.events",
-    "https://www.googleapis.com/auth/calendar.readonly",
+    // "https://oauth2.googleapis.com/token",
+    // "https://www.googleapis.com/auth/gmail.modify",
+    // "https://www.googleapis.com/auth/gmail.send",
+    // "https://www.googleapis.com/auth/gmail.readonly",
+    // "https://www.googleapis.com/auth/gmail.labels",
+    // "https://www.googleapis.com/auth/calendar",
+    // "https://www.googleapis.com/auth/calendar.events",
+    // "https://www.googleapis.com/auth/calendar.readonly",
   ];
 
   private constructor() {
-    this.oauthClient = new OAuth2Client(
-      env.GOOGLE_CLIENT_ID,
-      env.GOOGLE_CLIENT_SECRET,
-      env.GOOGLE_CALLBACK_URL,
-    );
+    this.oauthClient = this.createOAuthClient();
     logger.info("AuthService initialized");
+  }
+
+  private createOAuthClient(): OAuth2Client {
+    return new OAuth2Client({
+      clientId: env.GOOGLE_CLIENT_ID,
+      clientSecret: env.GOOGLE_CLIENT_SECRET,
+      redirectUri: env.GOOGLE_CALLBACK_URL,
+      transporterOptions: {
+        agent: getSystemHttpsAgent(),
+      },
+    });
   }
 
   public static getInstance(): AuthService {
@@ -95,7 +104,7 @@ export class AuthService {
     const url = this.oauthClient.generateAuthUrl({
       access_type: "offline",
       prompt: "consent",
-      scope: ["openid", "email", "profile"],
+      scope: this.SCOPES,
       state: state || Encryption.generateRandomToken(16),
     });
 
@@ -269,11 +278,7 @@ export class AuthService {
     refreshToken: string,
   ): Promise<string> {
     try {
-      const client = new OAuth2Client(
-        env.GOOGLE_CLIENT_ID,
-        env.GOOGLE_CLIENT_SECRET,
-        env.GOOGLE_CALLBACK_URL,
-      );
+      const client = this.createOAuthClient();
 
       client.setCredentials({ refresh_token: refreshToken });
       const { credentials } = await client.refreshAccessToken();
@@ -507,11 +512,7 @@ export class AuthService {
       .where(eq(users.id, userId))
       .limit(1);
 
-    const client = new OAuth2Client(
-      env.GOOGLE_CLIENT_ID,
-      env.GOOGLE_CLIENT_SECRET,
-      env.GOOGLE_CALLBACK_URL,
-    );
+    const client = this.createOAuthClient();
 
     const refreshToken = user?.encryptedRefreshToken
       ? Encryption.safeDecrypt(user.encryptedRefreshToken)
